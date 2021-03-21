@@ -1156,7 +1156,11 @@ local ui = Ui:new(nil, {
 }, HEIGHT, WIDTH)
 
 
-ui:run(UiRemoteControl, CuRemoteControl)
+if AUTOSTART_MINING then
+    ui:run(UiHandleStripmine)
+else
+    ui:run(UiRemoteControl, CuRemoteControl)
+end
 
 
 
