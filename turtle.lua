@@ -8,6 +8,7 @@ local LIGHT_ID = "minecraft:torch"
 local FUEL_SLOT = 16
 local FUEL_ID = "minecraft:coal"
 
+local AUTOSTART_MINING = true;
 local MEASURE_GPS_STRENGTH = false;
 
 
@@ -25,10 +26,11 @@ local WAIT_FOR_INPUT = 1;
 -- rednet globals
 local MODEM_SIDE = "left"
 local PROTOCOL_LOG = "LOG"
+local PROTOCOL_RC = "RC"
 
 -- UI globals
 local TOUCH_EVENT = "mouse_click"
-local RUNNING = true;
+local PROCESS_IS_RUNNING = false;
 local LOG_FILE_PATH = "logs/" .. os.date("%F") .. ".log"
 local LOGS = {}
 
@@ -57,10 +59,16 @@ function Log(msg, level)
     table.insert(LOGS, 1, {time=os.time("utc"), clock=os.clock(), level=level, log=msg})
 
     local function logLocal()
-        local h = fs.open(LOG_FILE_PATH, fs.exists(LOG_FILE_PATH) and "a" or "w")
-        h.write(os.date("%c") .. " > [" .. level .. "] " .. msg .. "\n")
-        h.flush()
-        h.close()
+        local h, err = fs.open(LOG_FILE_PATH, fs.exists(LOG_FILE_PATH) and "a" or "w")
+
+        if h ~= nil then
+            h.write(os.date("%c") .. " > [" .. level .. "] " .. msg .. "\n")
+            h.flush()
+            h.close()
+        else
+            print(err)
+        end
+
     end
 
     local function logRemote()
@@ -142,7 +150,7 @@ function Turtle:new (o, heading, position)
 end
 
 function Turtle:init()
-    Log("   booting up turtle", "boot")
+    Log("+++ booting turtle +++", "boot")
 
     local newTurtle = nil
     local function turtleFromInput()
@@ -165,7 +173,7 @@ function Turtle:init()
         return Turtle:new(nil, heading, {x = xInput, y = yInput, z = zInput})
     end
     
-    print("Booting up turtle...")
+    print("Booting turtle...")
     if WaitForEvent(WAIT_FOR_INPUT, "key") then
         newTurtle = turtleFromInput()
     else
@@ -532,7 +540,7 @@ function Turtle:invToChest(startSlot, endSlot)
         end
     end
     
-    Log("Emptied inventory: " .. empty)
+    Log("Emptied inventory: " .. tostring(empty))
     return empty
 end
 
@@ -861,6 +869,7 @@ function Ui:printMenu()
 
         table.insert(self.touchHandlers, i, {
             handler = value.ui,
+            cleanup = value.cleanup,
             xStart = xC,
             xEnd = xC + menuButton:len() - 1,
             y = self.term.height
@@ -872,26 +881,32 @@ function Ui:printMenu()
     term.setTextColor(colors.white)
 end
 
-function Ui:runProcess(f)
-    local function localRunner()
-        self:__printStopLine()
+function Ui:runProcess(f, cleanup)
+    local function processRunner()
         f(self)
         
         --reprint menu
         self:printMenu()
     end
     --function waiting for kill signal
-    local function localTerminator()
+    local function processHandler()
+        self:__printStopLine()
+
         repeat
             local _, _, x, y = os.pullEvent(TOUCH_EVENT)
         until y == self.term.height
+
+        --run cleanup function
+        if cleanup ~= nil then
+            cleanup()
+        end
 
         --reprint menu
         self:printMenu()
     end
 
     --finishes if program is finished or kill signal is send
-    parallel.waitForAny(localRunner, localTerminator)
+    parallel.waitForAny(processRunner, processHandler)
 end
 
 --function Ui:__killRunningProcess()
@@ -909,19 +924,18 @@ function Ui:__handleTouch(x, y)
 
     for i, touch in ipairs(self.touchHandlers) do        
         if x >= touch.xStart and x <= touch.xEnd and y == touch.y then
-            self:runProcess(touch.handler or DisplayError)
+            self:runProcess(touch.handler or DisplayError, touch.cleanup)
         end
     end
 end
 
-function Ui:run()
-    RUNNING = true;
+function Ui:run(startpage, startpageCleanup)
     --add stop button
     --table.insert(self.menu, 1, {name="Stop", nil})
 
     self:printMenu()
-    UiDebug(self)
-    while RUNNING do
+    self:runProcess(startpage, startpageCleanup)
+    while true do
         local _, _, x, y = os.pullEvent(TOUCH_EVENT)
         self:__handleTouch(x, y)
         sleep(0.1)
@@ -936,23 +950,52 @@ term.clear()
 --#endregion
 
 --#region Remote Control
-RemoteControl = {
-    socket = "ws://localhost"
-}
+RemoteControl = {}
 
-function RemoteControl:new(o, url)
+function RemoteControl:new(o)
     o = o or {}
     setmetatable(o, self)
     self.__index = self
-
-    self.socket = url or "ws://localhost"
 
     return o
 end
 
 function RemoteControl:run()
-    Log("starting rc")
-    
+    if peripheral.isPresent(MODEM_SIDE) then
+        rednet.open(MODEM_SIDE)
+        while true do
+            local event, sender, message, protocol = os.pullEvent("rednet_message")
+            if protocol == PROTOCOL_RC then
+                if false then
+                    rednet.send(sender, {type="error", payload="Turtle is busy"}, PROTOCOL_RC)
+                else
+                    local response = "no response";
+                    if message.type == "cmd" then
+                        if message.payload == "moveForward" then
+                            response = this:moveForward()
+                        elseif message.payload == "moveUp" then
+                            response = this:moveUp()
+                        elseif message.payload == "moveDown" then
+                            response = this:moveDown()
+                        elseif message.payload == "moveBack" then
+                            response = this:moveBack()
+                        elseif message.payload == "turnLeft" then
+                            response = this:turnLeft()
+                        elseif message.payload == "turnRight" then
+                            response = this:turnRight()
+                        elseif message.payload == "digForward" then
+                            response = this:dig()
+                        elseif message.payload == "digUp" then
+                            response = this:digUp()
+                        elseif message.payload == "digDown" then
+                            response = this:digDown()
+                        end
+                    end
+                    rednet.send(sender, {type="response", payload=response, position=this.position}, PROTOCOL_RC)
+                end
+            end
+        end
+    end
     
 end
 --#endregion
@@ -960,7 +1003,6 @@ end
 
 function UiHandleStripmine(ui)
     ui:reset()
-
     this:stripMine()
 end
 
@@ -986,7 +1028,7 @@ end
 
 function UiHandleRefuel(ui)
     ui:reset()
-    print("Refuel UI")
+    print("Coming Soon")
 end
 
 function UiHandleMove(ui)
@@ -1056,16 +1098,16 @@ function UiHandleMove(ui)
         term.write("z: ")
         local iz = tonumber(read())
 
-        ResetUI()
+        ui:reset()
         print("IM WALKING HERE!")
         print("Distance to target: ", this:distanceTo({x=ix,y=iy,z=iz}))
         this:moveTo({x=ix,y=iy,z=iz})
 
-        ResetUI()
+        ui:reset()
         print("Arrived at destination")
     end
 
-    local event, button, x, y = os.pullEvent("mouse_click") 
+    local event, button, x, y = os.pullEvent("mouse_click")
 
     if x < WIDTH / 2 and y ~= HEIGHT then
         moveManually()
@@ -1074,6 +1116,18 @@ function UiHandleMove(ui)
     if x > WIDTH / 2 and y ~= HEIGHT then
         moveAuto()
     end
+end
+
+function UiRemoteControl(ui)
+    ui:reset()
+    RUNNING = true;
+
+    print("Remote Control")
+    RemoteControl:new(nil):run()
+end
+
+function CuRemoteControl()
+    rednet.close()
 end
 
 --#region main program
@@ -1095,21 +1149,15 @@ local ui = Ui:new(nil, {
         ui=UiHandleBuildBridge
     },
     {
-        name="Refuel",
-        ui=UiHandleRefuel
+        name="Remote",
+        ui=UiRemoteControl,
+        cleanup=CuRemoteControl,
     },
 }, HEIGHT, WIDTH)
 
-local rc = RemoteControl:new(nil, "ws://malteschink.de:58080/echo")
 
-local function runUi()
-    ui:run()
-end
+ui:run(UiRemoteControl, CuRemoteControl)
 
-local function runRc()
-    rc:run()
-end
 
-parallel.waitForAll(runUi, runRc)
 
 --#endregion
