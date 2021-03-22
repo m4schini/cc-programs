@@ -686,25 +686,34 @@ function Turtle:stripMine(startPos)
     self:stripMine(startPos)
 end
 
-function Turtle:chunkMine(length)
+function Turtle:chunkMine(length, depth)
+    local DEPTH = depth or 16
     local LENGTH = length or 16
     local turnedLeft = false
 
-    for _ = 1, LENGTH-1, 1 do
-        for _ = 1, LENGTH-1, 1 do
-            self:digMove()
-        end
+    for _ = 1, DEPTH, 1 do
+        turnedLeft = false
+        self:digMoveDown()
 
-        if turnedLeft then
-            self:turnRight()
-            self:digMove()
-            self:turnRight()
-        else
-            self:turnLeft()
-            self:digMove()
-            self:turnLeft()
+        for _ = 1, LENGTH-1, 1 do
+            for _ = 1, LENGTH-1, 1 do
+                self:digMove()
+            end
+        
+            if turnedLeft then
+                self:turnRight()
+                self:digMove()
+                self:turnRight()
+                turnedLeft = false
+            else
+                self:turnLeft()
+                self:digMove()
+                self:turnLeft()
+                turnedLeft = true
+            end
         end
     end
+    
     
 end
 
