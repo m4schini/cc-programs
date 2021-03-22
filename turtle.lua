@@ -687,7 +687,7 @@ function Turtle:stripMine(startPos)
 end
 
 function Turtle:chunkMine(length)
-    local LENGTH = length
+    local LENGTH = length or 16
     local turnedLeft = false
 
     for _ = 1, LENGTH-1, 1 do
@@ -1030,7 +1030,7 @@ function UiHandleMine(ui)
     if input == "1" then
         ui:reset()
         this:stripMine()
-    elseif input == "3" then
+    elseif input == "2" then
         ui:reset()
         this:chunkMine()
     else
