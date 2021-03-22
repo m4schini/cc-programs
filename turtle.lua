@@ -1019,9 +1019,24 @@ end
 --#endregion
 
 
-function UiHandleStripmine(ui)
+function UiHandleMine(ui)
     ui:reset()
-    this:stripMine()
+    print("Select Program:")
+    print("1) Stripmine")
+    print("2) ChunkMine")
+
+    local input = read()
+
+    if input == "1" then
+        ui:reset()
+        this:stripMine()
+    elseif input == "3" then
+        ui:reset()
+        this:chunkMine()
+    else
+        print("Selection not recognized")
+    end
+
 end
 
 function UiHandleBuildBridge(ui)
@@ -1160,7 +1175,7 @@ local ui = Ui:new(nil, {
     },
     {
         name="Mine",
-        ui=UiHandleStripmine
+        ui=UiHandleMine
     },
     {
         name="Bridge",
@@ -1175,7 +1190,7 @@ local ui = Ui:new(nil, {
 
 
 if AUTOSTART_MINING then
-    ui:run(UiHandleStripmine)
+    ui:run(UiHandleMine)
 else
     ui:run(UiRemoteControl, CuRemoteControl)
 end
