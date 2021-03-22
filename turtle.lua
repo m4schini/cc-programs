@@ -8,7 +8,7 @@ local LIGHT_ID = "minecraft:torch"
 local FUEL_SLOT = 16
 local FUEL_ID = "minecraft:coal"
 
-local AUTOSTART_MINING = true;
+local AUTOSTART_MINING = false;
 local MEASURE_GPS_STRENGTH = false;
 
 
@@ -686,7 +686,25 @@ function Turtle:stripMine(startPos)
     self:stripMine(startPos)
 end
 
-function Turtle:chunkMine()
+function Turtle:chunkMine(length)
+    local LENGTH = length
+    local turnedLeft = false
+
+    for _ = 1, LENGTH-1, 1 do
+        for _ = 1, LENGTH-1, 1 do
+            self:digMove()
+        end
+
+        if turnedLeft then
+            self:turnRight()
+            self:digMove()
+            self:turnRight()
+        else
+            self:turnLeft()
+            self:digMove()
+            self:turnLeft()
+        end
+    end
     
 end
 
