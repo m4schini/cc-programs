@@ -695,7 +695,7 @@ function Turtle:chunkMine(length, depth)
         turnedLeft = false
         self:digMoveDown()
 
-        for _ = 1, LENGTH-1, 1 do
+        for _ = 1, LENGTH, 1 do
             for _ = 1, LENGTH-1, 1 do
                 self:digMove()
             end
@@ -719,35 +719,55 @@ end
 
 ---- Build Functions
 
-function Turtle:buildBridge(material, length, width)
-    local neededMaterial = length * width
-    print("Needed Material: " .. neededMaterial)
-
-    local materialAmount = self:invGetItemCount(material)
-    print("Stored Material: " .. materialAmount)
-
-    if neededMaterial > materialAmount then
-        Error("Not enough material. \n"
-                        .. "Needed: " .. neededMaterial .. "\nAvailable: " .. materialAmount)
-        return
-    end
+function Turtle:placeHorizontalFlat(material, length, width, replace, placeUp)
+    local origin = {x=self.position.x, y=self.position.y, z=self.position.z}
+    local oHeading = self.heading
+    placeUp = placeUp or false --usual usecase: build roof
+    replace = replace or false; --digging down before place floor
+    
+    
 
     local slot, count = self:invFindItem(material, 1 ,16)
     local turnedRight = false;
+    local function place(slot)
+        local placeFunction;
+
+        if placeUp then
+            placeFunction = self.placeUp
+        else
+            placeFunction = self.placeDown
+        end
+
+        if count > 0 then
+            if placeFunction(slot) then
+                count = count - 1;
+            end
+        else
+            slot, count = self:invFindItem(material, slot + 1, 16)
+            if placeFunction(slot) then
+                count = count - 1;
+            end
+        end
+    end
+
     for w = 1, width, 1 do
         for l = 1, length, 1 do
             self:digMove()
             self:digUp()
 
-            if count > 0 then
-                if self:placeDown(slot) then
-                    count = count - 1;
+            if replace then
+                if placeUp then
+                    self:digUp()
+                else
+                    self:digDown()
                 end
+            end
+
+            if count > 0 then
+                place(slot)
             else
                 slot, count = self:invFindItem(material, slot + 1, 16)
-                if self:placeDown(slot) then
-                    count = count - 1;
-                end
+                place(slot)
             end
         end
 
@@ -767,6 +787,10 @@ function Turtle:buildBridge(material, length, width)
             end
         end
     end
+
+    self:moveTo(origin)
+    self:turnTo(oHeading)
+    return 0, 0
 end
 
 --#endregion
@@ -1026,6 +1050,140 @@ function RemoteControl:run()
     
 end
 --#endregion
+--#region Builder Programs
+function BuildBridge(ui)
+    ui:reset()
+    print("Bridge Specifications: ")
+
+    term.write("length: ")
+    local length = tonumber(read())
+
+    term.write("width: ")
+    local width = tonumber(read())
+
+    term.write("replace ground [y/N]: ")
+    local replace = read() == "y"
+    
+    term.write("build roof [y/N]: ")
+    local roof = read() == "y"
+
+    print("material (def.: minecraft:cobblestone): ")
+    local material = read()
+    if material == "" then
+        material = "minecraft:cobblestone"
+    end
+
+    local neededMaterial = 0
+    if roof then
+        neededMaterial = length * width * 2
+    else
+        neededMaterial = length * width
+    end
+    local materialAmount = this:invGetItemCount(material)
+
+    if neededMaterial > materialAmount then
+        Error("Not enough material. \n"
+                        .. "Needed: " .. neededMaterial .. "\nAvailable: " .. materialAmount)
+        return neededMaterial, materialAmount
+    end
+
+    ui:reset()
+    this:placeHorizontalFlat(material , length, width, replace)
+    if roof then
+        this:moveUp()
+        this:placeHorizontalFlat(material , length, width, replace, true)
+        this:moveDown()
+    end
+end
+
+function BuildLadder(ui)
+    ui:reset()
+    term.write("Down or up? [D/u]: ")
+    local goup = read() == "u"
+
+    term.write("Distance: ")
+    local distance = tonumber(read())
+
+    print("Line 3: Filler")
+    print("Line 4: Ladder")
+
+
+    local function down()
+        this:digMoveDown()
+    end
+    local function up()
+        this:digMoveUp()
+    end
+
+    local digF = up
+    if not goup then
+        digF = down
+    end
+    local returnF = down
+    if not goup then
+        returnF = up
+    end
+
+    local function getSlot(slot, limit)
+        if slot > limit then
+            return -1
+        end
+        if turtle.getItemCount(slot) <= 0 then
+            return getSlot(slot + 1, limit)
+        end
+
+        return slot
+    end
+
+
+    for i = 1, distance, 1 do
+        digF()
+        this:place(getSlot(9, 12))
+    end
+    for _ = 1, distance, 1 do
+        returnF()
+        if goup then
+            this:placeUp(getSlot(13, 16))
+        else
+            this:placeDown(getSlot(13, 16))
+        end
+    end
+end
+
+function UiHandleBuild(ui)
+
+    local programs = {
+        {name="Bridge", executable=BuildBridge}, 
+        {name="Ladder", executable=BuildLadder}
+    }
+
+    ui:reset()
+    local amount = #programs
+    local center = math.floor(HEIGHT/2)
+    print(amount)
+    for i, program in ipairs(programs) do
+        term.setCursorPos((math.floor(WIDTH/amount) * i) - 12 , center)
+        term.write(program.name)
+    end
+
+    ----Pos printer
+    --local firstLine = "Current Pos:"
+    --local seconLine =  this.position.x .. ", " .. this.position.y .. ", " .. this.position.z
+    --term.setCursorPos(math.ceil(WIDTH/2) - math.floor(firstLine:len()/2), 1)
+    --print(firstLine)
+    --term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
+    --print(seconLine)
+
+    local event, button, x, y = os.pullEvent("mouse_click")
+
+    for i, program in ipairs(programs) do
+        if y < HEIGHT and x < (math.floor(WIDTH/amount) * i) then
+            program.executable(ui)
+            return
+        end
+    end
+end
+--#endregion
 
 
 function UiHandleMine(ui)
@@ -1048,47 +1206,12 @@ function UiHandleMine(ui)
 
 end
 
-function UiHandleBuildBridge(ui)
-    ui:reset()
-    print("Bridge Specifications: ")
-
-    term.write("length: ")
-    local length = tonumber(read())
-
-    term.write("width: ")
-    local width = tonumber(read())
-
-    print("material (def.: minecraft:cobblestone): ")
-    local material = read()
-    if material == "" then
-        material = "minecraft:cobblestone"
-    end
-
-    ui:reset()
-    this:buildBridge(material , length, width)
-end
-
 function UiHandleRefuel(ui)
     ui:reset()
     print("Coming Soon")
 end
 
 function UiHandleMove(ui)
-    ui:reset()
-    local firstLine = "Current Pos:"
-    local seconLine =  this.position.x .. ", " .. this.position.y .. ", " .. this.position.z
-    term.setCursorPos(math.ceil(WIDTH/2) - math.floor(firstLine:len()/2), 1)
-    print(firstLine)
-    term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
-    print(seconLine)
-
-    term.setCursorPos(WIDTH/4 -2, (HEIGHT - 1) / 2)
-    print("manual")
-
-    term.setCursorPos(3 * WIDTH/4, ((HEIGHT - 1) / 2) + 0)
-    print("auto")
-    
-
     local function moveManually()
         ui:reset()
         print("You're in control of the turtle")
@@ -1149,6 +1272,20 @@ function UiHandleMove(ui)
         print("Arrived at destination")
     end
 
+    ui:reset()
+    local firstLine = "Current Pos:"
+    local seconLine =  this.position.x .. ", " .. this.position.y .. ", " .. this.position.z
+    term.setCursorPos(math.ceil(WIDTH/2) - math.floor(firstLine:len()/2), 1)
+    print(firstLine)
+    term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
+    print(seconLine)
+
+    term.setCursorPos(WIDTH/4 -2, (HEIGHT - 1) / 2)
+    print("manual")
+
+    term.setCursorPos(3 * WIDTH/4, ((HEIGHT - 1) / 2) + 0)
+    print("auto")
+
     local event, button, x, y = os.pullEvent("mouse_click")
 
     if x < WIDTH / 2 and y ~= HEIGHT then
@@ -1187,8 +1324,8 @@ local ui = Ui:new(nil, {
         ui=UiHandleMine
     },
     {
-        name="Bridge",
-        ui=UiHandleBuildBridge
+        name="Build",
+        ui=UiHandleBuild
     },
     {
         name="Remote",
