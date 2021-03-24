@@ -1208,8 +1208,6 @@ end
 function UiHandleMove(ui)
     local function moveManually()
         ui:reset()
-        print("You're in control of the turtle")
-        print()
         print("w = forward")
         print("a = turn left")
         print("s = back")
@@ -1220,6 +1218,16 @@ function UiHandleMove(ui)
         print("r = dig up")
         print("f = dig")
         print("v = dig down")
+        print("b = drop tnt")
+
+        local function dropTnT()
+            local slot, count = this:invFindItem("minecraft:tnt", 1, 16)
+            if slot > 0 then
+                this:place(slot)
+                redstone.setOutput("front", true)
+                redstone.setOutput("front", false)
+            end
+        end
 
         while true do
             local event, key, is_held = os.pullEvent("key") 
@@ -1240,7 +1248,9 @@ function UiHandleMove(ui)
             elseif key == keys.f then
                 this:dig()
             elseif key == keys.v then
-                this.digDown()
+                this:digDown()
+            elseif key == keys.b then
+                dropTnT()
             end
         end
     end
