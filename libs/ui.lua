@@ -3,6 +3,7 @@ term.clear()
 term.setCursorPos(1, 1)
 
 local function clear(height, start)
+    height = height or TERM_HEIGHT
     start = start or 1
     term.setBackgroundColor(colors.black)
 
@@ -34,6 +35,11 @@ local function write(text, textColor, backgroundColor)
     term.setBackgroundColor(beforeBgColor)
 end
 
+local function writeln(text, textColor, backgroundColor)
+    write(text, textColor, backgroundColor)
+    print()
+end
+
 local function printLine(line, color)
     local oldColor = term.getBackgroundColor()
     color = color or term.getBackgroundColor()
@@ -44,9 +50,9 @@ end
 
 local function printStopLine()
     printLine(TERM_HEIGHT, colors.red)
-    term.setCursorPos(math.ceil(TERM_WIDTH / 2) - 2, TERM_HEIGHT)
+    term.setCursorPos(math.ceil(TERM_WIDTH / 2) - 1, TERM_HEIGHT)
     term.setTextColor(colors.white)
-    term.write("Stop")
+    write("stop", colors.white, colors.red)
 
     term.setTextColor(colors.white)
     term.setBackgroundColor(colors.black)
@@ -65,6 +71,7 @@ end
 return {
     clear=clear,
     write=write,
+    print=writeln,
     writeOnLine=writeOnLine,
     printLine=printLine,
     printStopLine=printStopLine,
