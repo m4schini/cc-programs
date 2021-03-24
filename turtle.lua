@@ -816,7 +816,8 @@ local this = Turtle:init()
 
 --#region ui
 
-function UiDebug(ui)
+function UiDebug(ui, openLogs)
+    openLogs = openLogs or false
     ui:reset()
 
     --line 1
@@ -850,7 +851,8 @@ function UiDebug(ui)
         end
     end    
     ui:addButton({x=WIDTH/2 - 5, y=3}, {x=WIDTH/2 + 7, y=3}, "show logs", showLogs, nil, colors.lightGray)
-    ui:awaitTouch()
+    showLogs()
+    --ui:awaitTouch()
 end
 
 Ui = {
@@ -1025,7 +1027,7 @@ function Ui:awaitTouch()
     self:__handleTouch(x, y)
 end
 
-function Ui:run(startpage, startpageCleanup)
+function Ui:run(startpage, startpageCleanup, ...)
     --add stop button
     --table.insert(self.menu, 1, {name="Stop", nil})
 
