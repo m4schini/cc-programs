@@ -1,4 +1,6 @@
 local args = { ... }
+local MODULE_FILE_ENDING = ".lua"
+local MODULE_INSTALL_LOCATION = "/rom/modules/main/"
 
 local URL_REPO_RAW = "https://raw.githubusercontent.com/m4schini/cc-programs/main/" 
 
@@ -11,11 +13,11 @@ function Install(name, asStartup)
 end
 
 function InstallModule(name)
-    local fileEnding = ".lua"
-    local filename = name .. fileEnding
+    local filename = name .. MODULE_FILE_ENDING
+    local modulePath = "rom/modules/main/"
 
     shell.run("wget", URL_REPO_RAW .. "libs/" .. filename, filename)
-    shell.run("mv", )
+    shell.run("mv", filename, MODULE_INSTALL_LOCATION .. filename)
 end
 
 
