@@ -2,26 +2,18 @@
 -- TODO Search Inventory for fuel if nothing left in fuel slot
 
 -- Config
+local INV_CONFIG = {
+    SLOT_01 = nil, SLOT_02 = nil, SLOT_03 = nil, SLOT_04 = nil,
+    SLOT_05 = nil, SLOT_06 = nil, SLOT_07 = nil, SLOT_08 = nil,
+    SLOT_09 = nil, SLOT_10 = nil, SLOT_11 = nil, SLOT_12 = nil,
+    SLOT_13 = nil, SLOT_14 = "storage", SLOT_15 = "light", SLOT_16 = "fuel",
+}
+
 local LIGHT_SLOT = 15
 local LIGHT_ID = "minecraft:torch"
 
 local FUEL_SLOT = 16
 local FUEL_ID = "minecraft:coal"
-
-local AUTOSTART_MINING = false;
-local MEASURE_GPS_STRENGTH = false;
-
-
-
--- [DONT CHANGE] CONSTANTS [DONT CHANGE]
-local NORTH = 0
-local EAST = 1
-local SOUTH = 2
-local WEST = 3
-
-local HEIGHT = 13
-local WIDTH = 39
-local WAIT_FOR_INPUT = 1;
 
 -- rednet globals
 local MODEM_SIDE = "left"
@@ -33,6 +25,16 @@ local TOUCH_EVENT = "mouse_click"
 local PROCESS_IS_RUNNING = false;
 local LOG_FILE_PATH = "logs/" .. os.date("%F") .. ".log"
 local LOGS = {}
+
+-- [DONT CHANGE] CONSTANTS [DONT CHANGE]
+local NORTH = 0
+local EAST = 1
+local SOUTH = 2
+local WEST = 3
+
+local HEIGHT = 13
+local WIDTH = 39
+local WAIT_FOR_INPUT = 1;
 
 --#region Misc stuff
 
@@ -831,7 +833,7 @@ function UiDebug(ui)
     ui:writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
 
     --line 2
-    ui:writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit() .. " | GPS_Strength: " .. tostring(MEASURE_GPS_STRENGTH and this:getSignalStrength()) .. "%")
+    ui:writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit())
 
     --line 3
     paintutils.drawLine(1, 3, WIDTH, 3, colors.gray)
@@ -1335,11 +1337,7 @@ local ui = Ui:new(nil, {
 }, HEIGHT, WIDTH)
 
 
-if AUTOSTART_MINING then
-    ui:run(UiHandleMine)
-else
-    ui:run(UiRemoteControl, CuRemoteControl)
-end
+ui:run(UiDebug)
 
 
 
