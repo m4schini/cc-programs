@@ -10,12 +10,23 @@ function Install(name, asStartup)
     end
 end
 
+function InstallModule(name)
+    local fileEnding = ".lua"
+    local filename = name .. fileEnding
+
+    shell.run("wget", URL_REPO_RAW .. "libs/" .. filename, filename)
+    shell.run("mv", )
+end
+
 
 if args[1] == "install" then
     local name = args[2]
     local asStartup = args[3] == "--startup"
     
     Install(name, asStartup)
+elseif args[1] == "import" then
+    local name = args[2]
+
 else
     print(args[1] .. " was not recognized")
 end
