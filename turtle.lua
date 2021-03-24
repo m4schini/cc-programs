@@ -312,20 +312,20 @@ function Turtle:gpsLocate()
     end
 end
 
-function Turtle:getSignalStrength()
-    rednet.open(peripheral.getNames()[1])
-    local echoChambers = rednet.lookup(ECHO_PROTOCOL)
-    local strength = 0
-
-    if echoChambers ~= nil then
-        rednet.broadcast("PING", ECHO_PROTOCOL)
-        local event, side, channel, replyChannel, message, distance = os.pullEvent("modem_message")
-        strength = math.floor((1 - (distance / 380)) * 100)                
-    end
-    
-    rednet.close()
-    return strength
-end
+-- function Turtle:getSignalStrength()
+    -- rednet.open(peripheral.getNames()[1])
+    -- local echoChambers = rednet.lookup(ECHO_PROTOCOL)
+    -- local strength = 0
+-- 
+    -- if echoChambers ~= nil then
+        -- rednet.broadcast("PING", ECHO_PROTOCOL)
+        -- local event, side, channel, replyChannel, message, distance = os.pullEvent("modem_message")
+        -- strength = math.floor((1 - (distance / 380)) * 100)                
+    -- end
+    -- 
+    -- rednet.close()
+    -- return strength
+-- end
 
 ---- movement functions
 
@@ -588,6 +588,7 @@ function Turtle:invGetItemCount(id)
 
     return amount
 end
+
 
 ---- Fuel functions
 
@@ -857,7 +858,7 @@ end
 
 Ui = {
     menu = {
-        {name="start", ui=handleDashboard}
+        {name="start", ui=nil}
     },
     touchHandlers = {}, --{{name=funcName, handler=handleFunc, xStart=0, xEnd=0, y=0}}
     term = {
