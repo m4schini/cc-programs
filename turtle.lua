@@ -513,6 +513,19 @@ function Turtle:digMoveDown()
     return self:moveDown()
 end
 
+function Turtle:dropTnt()
+    local slot, count = self:invFindItem("minecraft:tnt", 1, 16)
+    if slot > 0 then
+        self:place(slot)
+        sleep(0.1)
+        redstone.setOutput("front", true)
+        sleep(0.1)
+        redstone.setOutput("front", false)
+    else
+        Error("No TNT in Inventory")
+    end
+end
+
 ---- Inventory functions
 
 -- true, if the specified inventory space is full
@@ -686,35 +699,36 @@ function Turtle:stripMine(startPos)
     self:stripMine(startPos)
 end
 
-function Turtle:chunkMine(length, depth)
+function Turtle:chunkMine(depth, length)
     local DEPTH = depth or 16
     local LENGTH = length or 16
     local turnedLeft = false
 
     for _ = 1, DEPTH, 1 do
-        turnedLeft = false
-        self:digMoveDown()
-
-        for _ = 1, LENGTH, 1 do
+        for i = 1, LENGTH, 1 do
             for _ = 1, LENGTH-1, 1 do
                 self:digMove()
             end
-        
-            if turnedLeft then
-                self:turnRight()
-                self:digMove()
-                self:turnRight()
-                turnedLeft = false
+
+            if i < LENGTH then
+                if turnedLeft then
+                    self:turnRight()
+                    self:digMove()
+                    self:turnRight()
+                    turnedLeft = false
+                else
+                    self:turnLeft()
+                    self:digMove()
+                    self:turnLeft()
+                    turnedLeft = true
+                end
             else
                 self:turnLeft()
-                self:digMove()
-                self:turnLeft()
-                turnedLeft = true
+                self:digMoveDown()
+                turnedLeft = false;
             end
         end
     end
-    
-    
 end
 
 ---- Build Functions
@@ -1218,16 +1232,8 @@ function UiHandleMove(ui)
         print("r = dig up")
         print("f = dig")
         print("v = dig down")
+        print("g = attack")
         print("b = drop tnt")
-
-        local function dropTnT()
-            local slot, count = this:invFindItem("minecraft:tnt", 1, 16)
-            if slot > 0 then
-                this:place(slot)
-                redstone.setOutput("front", true)
-                redstone.setOutput("front", false)
-            end
-        end
 
         while true do
             local event, key, is_held = os.pullEvent("key") 
@@ -1249,8 +1255,10 @@ function UiHandleMove(ui)
                 this:dig()
             elseif key == keys.v then
                 this:digDown()
+            elseif key == keys.v then
+                turtle.attack()
             elseif key == keys.b then
-                dropTnT()
+                this:dropTnt()
             end
         end
     end
