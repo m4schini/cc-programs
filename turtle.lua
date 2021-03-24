@@ -822,16 +822,19 @@ function UiDebug(ui)
     --line 3
     paintutils.drawLine(1, 3, WIDTH, 3, colors.gray)
     ui:writeOnLine(3, "Logs (" .. table.maxn(LOGS) .. ")")
-
-    --line 4 to height-1
-    term.setBackgroundColor(colors.black)
-    for i = 1, HEIGHT-5, 1 do
-        local msg = LOGS[i] or ""
-        if msg ~= "" then
-            msg = "[" .. msg.level .. "] " .. msg.clock .. "s:" .. msg.log
+    local function showLogs()
+        --line 4 to height-1
+        term.setBackgroundColor(colors.black)
+        for i = 1, HEIGHT-5, 1 do
+            local msg = LOGS[i] or ""
+            if msg ~= "" then
+                msg = "[" .. msg.level .. "] " .. msg.clock .. "s:" .. msg.log
+            end
+            ui:writeOnLine(i+3, msg)
         end
-        ui:writeOnLine(i+3, msg)
-    end
+    end    
+    ui:addButton({x=WIDTH/2 - 5, y=3}, {x=WIDTH/2 + 7, y=3}, "show logs", showLogs, nil, colors.lightGray)
+    ui:awaitTouch()
 end
 
 Ui = {
@@ -918,12 +921,15 @@ function Ui:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanu
     local widthCenter = upperLeftCorner.x + (math.ceil(width / 2) - math.floor(content:len() / 2))
     local heightCenter = upperLeftCorner.y + math.floor(height/2)
 
-    term.setCursorPos(widthCenter + 1, heightCenter)
-    term.write(content)
-
     if borderColor ~= nil then
-        paintutils.drawBox(upperLeftCorner.x + 1, upperLeftCorner.y + 1, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        term.setCursorPos(widthCenter, heightCenter)
+        term.write(content)
         term.setBackgroundColor(colors.black)
+    else
+        term.setBackgroundColor(colors.black)
+        term.setCursorPos(widthCenter, heightCenter)
+        term.write(content)
     end
 
     self:__addTouchHandler(action, cleanup, upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y)
