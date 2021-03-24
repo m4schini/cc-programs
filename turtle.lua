@@ -814,7 +814,7 @@ function UiDebug(ui)
     elseif this.heading == 3 then
         headingStr = "WEST"
     end
-    ui:writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "}      " .. "Heading: " .. headingStr)        
+    ui:writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
 
     --line 2
     ui:writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit() .. " | GPS_Strength: " .. tostring(MEASURE_GPS_STRENGTH and this:getSignalStrength()) .. "%")
@@ -863,7 +863,7 @@ function Ui:new (o, menu, height, width)
     return o
 end
 
-function Ui:clear(height, start)
+function Ui:__clear(height, start)
     start = start or 1
     term.setBackgroundColor(colors.black)
 
@@ -881,7 +881,10 @@ function Ui:writeOnLine(line, text)
 end
 
 function Ui:reset()
-    self:clear(HEIGHT - 1)
+    self:__clear(HEIGHT)
+    self:printTaskBar()
+
+    term.setBackgroundColor(colors.black)
     term.setCursorPos(1,1)
 end
 
@@ -907,7 +910,37 @@ function Ui:__printStopLine()
     term.setCursorPos(1,1)
 end
 
-function Ui:printMenu()
+function Ui:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanup, borderColor)
+    
+    local width = math.abs(upperLeftCorner.x - lowerRightCorner.x)
+    local height = math.abs(upperLeftCorner.y - lowerRightCorner.y)
+
+    local widthCenter = upperLeftCorner.x + (math.ceil(width / 2) - math.floor(content:len() / 2))
+    local heightCenter = upperLeftCorner.y + math.floor(height/2)
+
+    term.setCursorPos(widthCenter + 1, heightCenter)
+    term.write(content)
+
+    if borderColor ~= nil then
+        paintutils.drawBox(upperLeftCorner.x + 1, upperLeftCorner.y + 1, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        term.setBackgroundColor(colors.black)
+    end
+
+    self:__addTouchHandler(action, cleanup, upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y)
+end
+
+function Ui:__addTouchHandler(handler, cleanup, xStart, yStart, xEnd, yEnd)
+    table.insert(self.touchHandlers, {
+        handler = handler,
+        cleanup = cleanup,
+        xStart = xStart,
+        xEnd = xEnd,
+        yStart = yStart,
+        yEnd = yEnd
+    })
+end
+
+function Ui:printTaskBar()
     self.touchHandlers = {} --clean touch handlers
 
     self:__printLine(colors.lightGray, self.term.height)
@@ -918,14 +951,7 @@ function Ui:printMenu()
         local xC, yC = term.getCursorPos()
         local menuButton = " " .. value.name .. " |"
 
-        table.insert(self.touchHandlers, i, {
-            handler = value.ui,
-            cleanup = value.cleanup,
-            xStart = xC,
-            xEnd = xC + menuButton:len() - 1,
-            y = self.term.height
-        })
-
+        self:__addTouchHandler(value.ui, value.cleanup, xC, self.term.height, xC + menuButton:len() - 1, self.term.height)
         self:printColor(menuButton, colors.black)
     end
 
@@ -937,7 +963,7 @@ function Ui:runProcess(f, cleanup)
         f(self)
         
         --reprint menu
-        self:printMenu()
+        self:printTaskBar()
     end
     --function waiting for kill signal
     local function processHandler()
@@ -953,20 +979,12 @@ function Ui:runProcess(f, cleanup)
         end
 
         --reprint menu
-        self:printMenu()
+        self:printTaskBar()
     end
 
     --finishes if program is finished or kill signal is send
     parallel.waitForAny(processRunner, processHandler)
 end
-
---function Ui:__killRunningProcess()
---    term.setCursorPos(1,4)
---    print("trigged kill")
---    if self.runningProcess ~= nil then
---        os.queueEvent("kill_process", self.runningProcess)
---    end
---end
 
 function Ui:__handleTouch(x, y)
     local function DisplayError(_, _)
@@ -974,17 +992,22 @@ function Ui:__handleTouch(x, y)
     end
 
     for i, touch in ipairs(self.touchHandlers) do        
-        if x >= touch.xStart and x <= touch.xEnd and y == touch.y then
+        if x >= touch.xStart and x <= touch.xEnd and y >= touch.yStart and y <= touch.yEnd then
             self:runProcess(touch.handler or DisplayError, touch.cleanup)
         end
     end
+end
+
+function Ui:awaitTouch()
+    local _, _, x, y = os.pullEvent(TOUCH_EVENT)
+    self:__handleTouch(x, y)
 end
 
 function Ui:run(startpage, startpageCleanup)
     --add stop button
     --table.insert(self.menu, 1, {name="Stop", nil})
 
-    self:printMenu()
+    self:printTaskBar()
     self:runProcess(startpage, startpageCleanup)
     while true do
         local _, _, x, y = os.pullEvent(TOUCH_EVENT)
@@ -995,9 +1018,6 @@ end
 
 
 term.clear()
-
-
-
 --#endregion
 
 --#region Remote Control
@@ -1151,59 +1171,27 @@ function BuildLadder(ui)
 end
 
 function UiHandleBuild(ui)
-
-    local programs = {
-        {name="Bridge", executable=BuildBridge}, 
-        {name="Ladder", executable=BuildLadder}
-    }
-
     ui:reset()
-    local amount = #programs
-    local center = math.floor(HEIGHT/2)
-    print(amount)
-    for i, program in ipairs(programs) do
-        term.setCursorPos((math.floor(WIDTH/amount) * i) - 12 , center)
-        term.write(program.name)
-    end
-
-    ----Pos printer
-    --local firstLine = "Current Pos:"
-    --local seconLine =  this.position.x .. ", " .. this.position.y .. ", " .. this.position.z
-    --term.setCursorPos(math.ceil(WIDTH/2) - math.floor(firstLine:len()/2), 1)
-    --print(firstLine)
-    --term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
-    --print(seconLine)
-
-    local event, button, x, y = os.pullEvent("mouse_click")
-
-    for i, program in ipairs(programs) do
-        if y < HEIGHT and x < (math.floor(WIDTH/amount) * i) then
-            program.executable(ui)
-            return
-        end
-    end
+    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Bridge", BuildBridge, nil, colors.red)
+    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "Ladder", BuildLadder, nil, colors.lightGray)
+    ui:awaitTouch()
 end
 --#endregion
 
 
 function UiHandleMine(ui)
-    ui:reset()
-    print("Select Program:")
-    print("1) Stripmine")
-    print("2) ChunkMine")
-
-    local input = read()
-
-    if input == "1" then
-        ui:reset()
+    local function stripMine()
         this:stripMine()
-    elseif input == "2" then
-        ui:reset()
-        this:chunkMine()
-    else
-        print("Selection not recognized")
     end
 
+    local function chunkMine()
+        this:chunkMine()
+    end
+
+    ui:reset()
+    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Stripmine", stripMine)
+    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "ChunkMine", chunkMine)
+    ui:awaitTouch()
 end
 
 function UiHandleRefuel(ui)
@@ -1280,21 +1268,9 @@ function UiHandleMove(ui)
     term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
     print(seconLine)
 
-    term.setCursorPos(WIDTH/4 -2, (HEIGHT - 1) / 2)
-    print("manual")
-
-    term.setCursorPos(3 * WIDTH/4, ((HEIGHT - 1) / 2) + 0)
-    print("auto")
-
-    local event, button, x, y = os.pullEvent("mouse_click")
-
-    if x < WIDTH / 2 and y ~= HEIGHT then
-        moveManually()
-    end
-
-    if x > WIDTH / 2 and y ~= HEIGHT then
-        moveAuto()
-    end
+    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "manual", moveManually)
+    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "auto", moveAuto)
+    ui:awaitTouch()
 end
 
 function UiRemoteControl(ui)
