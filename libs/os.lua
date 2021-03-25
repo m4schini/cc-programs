@@ -55,7 +55,7 @@ function OS:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanu
     local heightCenter = upperLeftCorner.y + math.floor(height/2)
 
     if borderColor ~= nil then
-        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        paintutils.drawFilledBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
     end
 
     self.out.setCursorPos(heightCenter, widthCenter)

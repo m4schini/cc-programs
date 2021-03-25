@@ -1,0 +1,22 @@
+{
+    "Lua.diagnostics.globals": [
+        "term",
+        "paintutils",
+        "colors",
+        "parallel",
+        "sleep",
+        "shell",
+        "fs",
+        "peripheral",
+        "rednet",
+        "turtle",
+        "read",
+        "textutils",
+        "keys",
+        "redstone",
+        "gps"
+    ],
+    "Lua.diagnostics.disable": [
+        "undefined-field"
+    ]
+}

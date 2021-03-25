@@ -1,6 +1,6 @@
 local args = { ... }
 local MODULE_FILE_ENDING = ".lua"
-local MODULE_INSTALL_LOCATION = "/rom/modules/main/"
+local MODULE_INSTALL_LOCATION = "/libs/"
 
 local URL_REPO_RAW = "https://raw.githubusercontent.com/m4schini/cc-programs/main/" 
 
@@ -14,7 +14,6 @@ end
 
 function InstallModule(name)
     local filename = name .. MODULE_FILE_ENDING
-    local modulePath = "rom/modules/main/"
 
     shell.run("wget", URL_REPO_RAW .. "libs/" .. filename, filename)
     shell.run("mv", filename, MODULE_INSTALL_LOCATION .. filename)
@@ -29,6 +28,7 @@ if args[1] == "install" then
 elseif args[1] == "import" then
     local name = args[2]
 
+    InstallModule(name)
 else
     print(args[1] .. " was not recognized")
 end

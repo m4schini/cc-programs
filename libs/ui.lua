@@ -3,7 +3,7 @@ term.clear()
 term.setCursorPos(1, 1)
 
 local function clear(height, start)
-    height = height or TERM_HEIGHT-2
+    height = height or TERM_HEIGHT-1
     start = start or 1
     term.setBackgroundColor(colors.black)
 
