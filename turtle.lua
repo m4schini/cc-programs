@@ -1145,8 +1145,8 @@ end
 
 function UiHandleBuild(system)
     system.out.clear()
-    system:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Bridge", BuildBridge, nil, colors.red)
-    system:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "Ladder", BuildLadder, nil, colors.lightGray)
+    system:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Bridge", BuildBridge, nil, colors.lightBlue)
+    system:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "Ladder", BuildLadder, nil, colors.cyan)
     system:awaitTouch()
 end
 --#endregion

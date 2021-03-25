@@ -16,7 +16,7 @@ keyBindings[keys.e] = "inventory"
 keyBindings[keys.t] = "scan"
 
 function Import(modname)
-    if not fs.exists("/libs/" .. modname) then
+    if not fs.exists("/libs/" .. modname .. ".lua") or fs.exists("DEVENV") then
         local request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
         if request ~= nil then 
             local handler = fs.open("/libs/" .. modname .. ".lua", "w");
@@ -49,11 +49,11 @@ function cutModId(name)
     return string.sub(name, string.find(name, ":") + 1, name:len() )
 end
 
-local function UiPlaceholder(ui)
-    ui.write("PLATZHALTER " .. os.clock(), colors.red)
+local function UiPlaceholder(system)
+    system.out.print("PLATZHALTER " .. os.clock(), colors.red)
 end
 
-local function UiRemoteControl(ui)
+local function UiRemoteControl(system)
     rednet.open(MODEM_SIDE)
 
     local availableReceivers = rednet.lookup(PROTOCOL_RC)
@@ -76,7 +76,7 @@ local function UiRemoteControl(ui)
     end
 
 
-    ui.clear()
+    system.out.clear()
     print("You're in control of the turtle")
     print()
     print("w = forward")
@@ -99,51 +99,57 @@ local function UiRemoteControl(ui)
 
             local sender, message, protocol = rednet.receive()
         
-            ui.clear()
-            ui.write("x=" .. message.position.x)
-            ui.write(" y=" .. message.position.y)
-            ui.write(" z=" .. message.position.z)
+            system.out.clear()
+            system.out.drawLine(1, colors.lightGray)
+            system.out.setCursorPos(1)
+            
+            system.out.print(
+                "x=" .. message.position.x ..
+                " y=" .. message.position.y ..
+                " z=" .. message.position.z ..
+                " h=" .. toHeading(message.position.heading or -1),
+            colors.black,
+            colors.lightGray)
 
-            local heading = toHeading(message.position.heading or -1)
-            ui.write(" h=" .. heading)
+            system.out.setCursorPos(2)
 
-            ui.printLine(2, colors.lightGray)
-            ui.setCursorPos(3)
+            if message.payloadType ~= "INV" then
+                system.out.println("above: ", colors.lightGray)
+                system.out.println(message.scan.up.name or "air")
 
-            ui.print("above: ", colors.lightGray)
-            ui.print(message.scan.up.name or "air")
+                system.out.println("infront: ", colors.lightGray)
+                system.out.println(message.scan.front.name or "air")
 
-            ui.print("infront: ", colors.lightGray)
-            ui.print(message.scan.front.name or "air")
+                system.out.println("below: ", colors.lightGray)
+                system.out.println(message.scan.down.name or "air")
 
-            ui.print("below: ", colors.lightGray)
-            ui.print(message.scan.down.name or "air")
-
-            ui.printLine(9, colors.lightGray)
-            ui.setCursorPos(10)
-
+                system.out.drawLine(8, colors.lightGray)
+                system.out.setCursorPos(8)
+                system.out.println("response: ", colors.black, colors.lightGray)
+            else
+                system.out.println("Inventory: ") 
+            end
             if message.payloadType == "INV" then
                 for i, slot in ipairs(message.payload) do
-                    ui.write(slot.count)
+                    system.out.print(i .. ":" .. slot.count)
 
                     local _, cY = term.getCursorPos()
-                    term.setCursorPos(3, cY)
+                    term.setCursorPos(5, cY)
 
-                    ui.write(" | ", colors.gray)
-                    ui.print(cutModId(slot.name))
+                    system.out.print("| ", colors.gray)
+                    system.out.println(cutModId(slot.name))
                 end
             elseif message.payloadType == "SCAN" then
                 for location, scan in pairs(message.payload) do
-                    ui.write(location, colors.lightGray)
-                    ui.write(": ", colors.lightGray)
+                    system.out.print(location, colors.lightGray)
+                    system.out.print(": ", colors.lightGray)
 
                     local _, cY = term.getCursorPos()
                     term.setCursorPos(8, cY)
-                    ui.print(cutModId(scan.name or "minecraft:air"))
+                    system.out.println(cutModId(scan.name or "minecraft:air"))
                 end
             else
-                ui.write("response: ")
-                print(textutils.serialize(message.payload))
+                system.out.println(textutils.serialize(message.payload))
             end
         end
     end
