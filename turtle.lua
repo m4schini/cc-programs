@@ -38,7 +38,7 @@ local WAIT_FOR_INPUT = 1;
 
 --#region Imports
 function Import(modname)
-    if not fs.exists("/libs/" .. modname) then
+    if not fs.exists("/libs/" .. modname .. ".lua") then
         local request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
         if request ~= nil then 
             local handler = fs.open("/libs/" .. modname .. ".lua", "w");
@@ -924,9 +924,9 @@ local this = Turtle:init()
 
 --#region ui
 
-function UiDebug(ui, openLogs)
+function UiDebug(system, openLogs)
     openLogs = openLogs or false
-    ui:reset()
+    system.out.clear()
 
     --line 1
     local headingStr = "ERR"
@@ -939,14 +939,14 @@ function UiDebug(ui, openLogs)
     elseif this.heading == 3 then
         headingStr = "WEST"
     end
-    ui:writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
+    system.out.writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
 
     --line 2
-    ui:writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit())
+    system.out.writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit())
 
     --line 3
     paintutils.drawLine(1, 3, WIDTH, 3, colors.gray)
-    ui:writeOnLine(3, "Logs (" .. table.maxn(LOGS) .. ")")
+    system.out.writeOnLine(3, "Logs (" .. table.maxn(LOGS) .. ")")
     local function showLogs()
         --line 4 to height-1
         term.setBackgroundColor(colors.black)
@@ -955,201 +955,15 @@ function UiDebug(ui, openLogs)
             if msg ~= "" then
                 msg = "[" .. msg.level .. "] " .. msg.clock .. "s:" .. msg.log
             end
-            ui:writeOnLine(i+3, msg)
+            system.out.writeOnLine(i+3, msg)
         end
     end    
-    ui:addButton({x=WIDTH/2 - 5, y=3}, {x=WIDTH/2 + 7, y=3}, "show logs", showLogs, nil, colors.lightGray)
+    system:addButton({x=WIDTH/2 - 5, y=3}, {x=WIDTH/2 + 7, y=3}, "show logs", showLogs, nil, colors.lightGray)
     showLogs()
     --ui:awaitTouch()
 end
 
-Ui = {
-    menu = {
-        {name="start", ui=nil}
-    },
-    touchHandlers = {}, --{{name=funcName, handler=handleFunc, xStart=0, xEnd=0, y=0}}
-    term = {
-        height=13,
-        width=39
-    },
-    runningProcess = nil
-}
 
-function Ui:new (o, menu, height, width)
-    o = o or {}
-    setmetatable(o, self)
-    self.__index = self
-
-    self.touchHandlers = {}
-    self.menu = menu or {{name="Debug", ui=UiDebug}}
-    self.term = {
-        height=height,
-        width=width,
-    }
-
-    self.runningProcess = nil
-    o:reset()
-    return o
-end
-
-function Ui:__clear(height, start)
-    start = start or 1
-    term.setBackgroundColor(colors.black)
-
-    for i = start, height, 1 do
-        term.setCursorPos(1,i)
-        term.clearLine()
-    end
-    term.setCursorPos(1,1)
-end
-
-function Ui:writeOnLine(line, text)
-    term.setCursorPos(1,line)
-    term.write(text)
-    term.setCursorPos(1,1)
-end
-
-function Ui:reset()
-    self:__clear(HEIGHT)
-    self:printTaskBar()
-
-    term.setBackgroundColor(colors.black)
-    term.setCursorPos(1,1)
-end
-
-function Ui:printColor(str, color)
-    local oldColor = term.getTextColor()
-    term.setTextColor(color)
-    term.write(str)
-    term.setTextColor(oldColor)
-end
-
-function Ui:__printLine(color, line)
-    paintutils.drawLine(1, line, self.term.width, line, color)
-end
-
-function Ui:__printStopLine()
-    self:__printLine(colors.red, self.term.height)
-    term.setCursorPos(math.ceil(self.term.width / 2) - 2, self.term.height)
-    term.setTextColor(colors.white)
-    term.write("Stop")
-
-    term.setTextColor(colors.white)
-    term.setBackgroundColor(colors.black)
-    term.setCursorPos(1,1)
-end
-
-function Ui:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanup, borderColor)
-    
-    local width = math.abs(upperLeftCorner.x - lowerRightCorner.x)
-    local height = math.abs(upperLeftCorner.y - lowerRightCorner.y)
-
-    local widthCenter = upperLeftCorner.x + (math.ceil(width / 2) - math.floor(content:len() / 2))
-    local heightCenter = upperLeftCorner.y + math.floor(height/2)
-
-    if borderColor ~= nil then
-        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
-        term.setCursorPos(widthCenter, heightCenter)
-        term.write(content)
-        term.setBackgroundColor(colors.black)
-    else
-        term.setBackgroundColor(colors.black)
-        term.setCursorPos(widthCenter, heightCenter)
-        term.write(content)
-    end
-
-    self:__addTouchHandler(action, cleanup, upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y)
-end
-
-function Ui:__addTouchHandler(handler, cleanup, xStart, yStart, xEnd, yEnd)
-    table.insert(self.touchHandlers, {
-        handler = handler,
-        cleanup = cleanup,
-        xStart = xStart,
-        xEnd = xEnd,
-        yStart = yStart,
-        yEnd = yEnd
-    })
-end
-
-function Ui:printTaskBar()
-    self.touchHandlers = {} --clean touch handlers
-
-    self:__printLine(colors.lightGray, self.term.height)
-    term.setCursorPos(1, self.term.height)
-
-    
-    for i, value in ipairs(self.menu) do
-        local xC, yC = term.getCursorPos()
-        local menuButton = " " .. value.name .. " |"
-
-        self:__addTouchHandler(value.ui, value.cleanup, xC, self.term.height, xC + menuButton:len() - 1, self.term.height)
-        self:printColor(menuButton, colors.black)
-    end
-
-    term.setTextColor(colors.white)
-end
-
-function Ui:runProcess(f, cleanup)
-    local function processRunner()
-        f(self)
-        
-        --reprint menu
-        self:printTaskBar()
-    end
-    --function waiting for kill signal
-    local function processHandler()
-        self:__printStopLine()
-
-        repeat
-            local _, _, x, y = os.pullEvent(TOUCH_EVENT)
-        until y == self.term.height
-
-        --run cleanup function
-        if cleanup ~= nil then
-            cleanup()
-        end
-
-        --reprint menu
-        self:printTaskBar()
-    end
-
-    --finishes if program is finished or kill signal is send
-    parallel.waitForAny(processRunner, processHandler)
-end
-
-function Ui:__handleTouch(x, y)
-    local function DisplayError(_, _)
-        Error("Missing handler for registered touch input field")
-    end
-
-    for i, touch in ipairs(self.touchHandlers) do        
-        if x >= touch.xStart and x <= touch.xEnd and y >= touch.yStart and y <= touch.yEnd then
-            self:runProcess(touch.handler or DisplayError, touch.cleanup)
-        end
-    end
-end
-
-function Ui:awaitTouch()
-    local _, _, x, y = os.pullEvent(TOUCH_EVENT)
-    self:__handleTouch(x, y)
-end
-
-function Ui:run(startpage, startpageCleanup, ...)
-    --add stop button
-    --table.insert(self.menu, 1, {name="Stop", nil})
-
-    self:printTaskBar()
-    self:runProcess(startpage, startpageCleanup)
-    while true do
-        local _, _, x, y = os.pullEvent(TOUCH_EVENT)
-        self:__handleTouch(x, y)
-        sleep(0.1)
-    end
-end
-
-
-term.clear()
 --#endregion
 
 --#region Remote Control
@@ -1224,9 +1038,10 @@ function RemoteControl:run()
     
 end
 --#endregion
+
 --#region Builder Programs
-function BuildBridge(ui)
-    ui:reset()
+function BuildBridge(system)
+    system.out.clear()
     print("Bridge Specifications: ")
 
     term.write("length: ")
@@ -1261,7 +1076,7 @@ function BuildBridge(ui)
         return neededMaterial, materialAmount
     end
 
-    ui:reset()
+    system.out.clear()
     this:placeHorizontalFlat(material , length, width, replace)
     if roof then
         this:moveUp()
@@ -1270,8 +1085,8 @@ function BuildBridge(ui)
     end
 end
 
-function BuildLadder(ui)
-    ui:reset()
+function BuildLadder(system)
+    system.out.clear()
     term.write("Down or up? [D/u]: ")
     local goup = read() == "u"
 
@@ -1324,16 +1139,16 @@ function BuildLadder(ui)
     end
 end
 
-function UiHandleBuild(ui)
-    ui:reset()
-    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Bridge", BuildBridge, nil, colors.red)
-    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "Ladder", BuildLadder, nil, colors.lightGray)
-    ui:awaitTouch()
+function UiHandleBuild(system)
+    system.out.clear()
+    system:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Bridge", BuildBridge, nil, colors.red)
+    system:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "Ladder", BuildLadder, nil, colors.lightGray)
+    system:awaitTouch()
 end
 --#endregion
 
 
-function UiHandleMine(ui)
+function UiHandleMine(system)
     local function stripMine()
         this:stripMine()
     end
@@ -1342,20 +1157,20 @@ function UiHandleMine(ui)
         this:chunkMine()
     end
 
-    ui:reset()
-    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Stripmine", stripMine)
-    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "ChunkMine", chunkMine)
-    ui:awaitTouch()
+    system.out.clear()
+    system:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "Stripmine", stripMine)
+    system:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "ChunkMine", chunkMine)
+    system:awaitTouch()
 end
 
-function UiHandleRefuel(ui)
-    ui:reset()
+function UiHandleRefuel(system)
+    system.out.clear()
     print("Coming Soon")
 end
 
-function UiHandleMove(ui)
+function UiHandleMove(system)
     local function moveManually()
-        ui:reset()
+        system.out.clear()
         print("w = forward")
         print("a = turn left")
         print("s = back")
@@ -1398,7 +1213,7 @@ function UiHandleMove(ui)
     end
 
     local function moveAuto()
-        ui:reset()
+        system.out.clear()
         print("WARNING!")
         print("This auto navigation is pretty dumb. It will go through everything, if it thinks it has to!")
         print("Enter Taget Coordinates")
@@ -1409,16 +1224,16 @@ function UiHandleMove(ui)
         term.write("z: ")
         local iz = tonumber(read())
 
-        ui:reset()
+        system.out.clear()
         print("IM WALKING HERE!")
         print("Distance to target: ", this:distanceTo({x=ix,y=iy,z=iz}))
         this:moveTo({x=ix,y=iy,z=iz})
 
-        ui:reset()
+        system.out.clear()
         print("Arrived at destination")
     end
 
-    ui:reset()
+    system.out.clear()
     local firstLine = "Current Pos:"
     local seconLine =  this.position.x .. ", " .. this.position.y .. ", " .. this.position.z
     term.setCursorPos(math.ceil(WIDTH/2) - math.floor(firstLine:len()/2), 1)
@@ -1426,13 +1241,13 @@ function UiHandleMove(ui)
     term.setCursorPos(math.ceil(WIDTH/2) - math.floor(seconLine:len()/2), 2)
     print(seconLine)
 
-    ui:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "manual", moveManually)
-    ui:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "auto", moveAuto)
-    ui:awaitTouch()
+    system:addButton({x=0, y=0}, {x=WIDTH/2, y=HEIGHT-1}, "manual", moveManually)
+    system:addButton({x=WIDTH/2, y=0}, {x=WIDTH, y=HEIGHT-1}, "auto", moveAuto)
+    system:awaitTouch()
 end
 
-function UiRemoteControl(ui)
-    ui:reset()
+function UiRemoteControl(system)
+    system.out.clear()
     RUNNING = true;
 
     print("Remote Control | ID: " .. os.getComputerID())
@@ -1445,33 +1260,40 @@ function CuRemoteControl()
     RUNNING = false
 end
 
+function CleanUpUi(system)
+    system.out.clear()
+end
+
 --#region main program
-local ui = Ui:new(nil, {
+local operatingSystem = osLib:new(nil, {
     {
         name="Debug",
         ui=UiDebug,
     },
     {
         name="Move",
-        ui=UiHandleMove
+        ui=UiHandleMove,
+        cleanup=CleanUpUi
     },
     {
         name="Mine",
-        ui=UiHandleMine
+        ui=UiHandleMine,
+        cleanup=CleanUpUi
     },
     {
         name="Build",
-        ui=UiHandleBuild
+        ui=UiHandleBuild,
+        cleanup=CleanUpUi
     },
     {
         name="Remote",
         ui=UiRemoteControl,
         cleanup=CuRemoteControl,
     },
-}, HEIGHT, WIDTH)
+}, 
+uiLib)
 
-
-ui:run(UiDebug)
+operatingSystem:run(UiDebug)
 
 
 
