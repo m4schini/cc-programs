@@ -55,11 +55,11 @@ function OS:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanu
     local heightCenter = upperLeftCorner.y + math.floor(height/2)
 
     if borderColor ~= nil then
-        paintutils.drawFilledBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
     end
 
     self.out.setCursorPos(heightCenter, widthCenter)
-    self.out.write(content, nil, colors.black)
+    self.out.print(content, nil, colors.black)
 
     self:addTouchHandler(action, cleanup, upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y)
 end
@@ -70,7 +70,7 @@ function OS:printTaskBar()
 
     self:resetTouchHandlers()
 
-    self.out.printLine(TERM_HEIGHT, color_background)
+    self.out.drawLine(TERM_HEIGHT, color_background)
     self.out.setCursorPos(TERM_HEIGHT)
 
     for _, value in ipairs(self.__menu__) do
@@ -78,7 +78,7 @@ function OS:printTaskBar()
         local menuButtonText = " " .. value.name .. " |"
 
         self:addTouchHandler(value.ui, value.cleanup, xOfCursor, TERM_HEIGHT, xOfCursor + menuButtonText:len() - 1, TERM_HEIGHT)
-        self.out.write(menuButtonText, color_text, color_background)
+        self.out.print(menuButtonText, color_text, color_background)
     end
 
     self.out.setCursorPos(1, 1)
@@ -93,7 +93,7 @@ function OS:runProcess(f, cleanup)
     end
     --function waiting for kill signal
     local function processHandler()
-        self.out.printStopLine()
+        self.out.drawAbort()
 
         repeat
             local _, _, x, y = os.pullEvent(self.__TOUCH_EVENT__)

@@ -50,9 +50,9 @@ end
 
 local function printStopLine()
     printLine(TERM_HEIGHT, colors.red)
-    term.setCursorPos(math.ceil(TERM_WIDTH / 2) - 1, TERM_HEIGHT)
+    term.setCursorPos(math.ceil(TERM_WIDTH / 2) - 3, TERM_HEIGHT)
     term.setTextColor(colors.white)
-    write("stop", colors.white, colors.red)
+    write("abort", colors.white, colors.red)
 
     term.setTextColor(colors.white)
     term.setBackgroundColor(colors.black)
@@ -70,10 +70,11 @@ end
 
 return {
     clear=clear,
-    write=write,
-    print=writeln,
-    writeOnLine=writeOnLine,
-    printLine=printLine,
-    printStopLine=printStopLine,
-    setCursorPos=setCursorPos
+    print=write,
+    println=writeln,
+
+    setCursorPos=setCursorPos,
+
+    drawLine=printLine,
+    drawAbort=printStopLine,
 }
