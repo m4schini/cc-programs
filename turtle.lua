@@ -3,10 +3,10 @@
 
 -- Config
 local INV_CONFIG = {
-    SLOT_01 = nil, SLOT_02 = nil, SLOT_03 = nil, SLOT_04 = nil,
-    SLOT_05 = nil, SLOT_06 = nil, SLOT_07 = nil, SLOT_08 = nil,
-    SLOT_09 = nil, SLOT_10 = nil, SLOT_11 = nil, SLOT_12 = nil,
-    SLOT_13 = nil, SLOT_14 = "storage", SLOT_15 = "light", SLOT_16 = "fuel",
+    nil,nil, nil, nil,
+    nil,nil, nil, nil,
+    nil,nil, nil, nil,
+    "storage", "light", "light", "fuel",
 }
 
 local LIGHT_SLOT = 15
@@ -36,7 +36,24 @@ local HEIGHT = 13
 local WIDTH = 39
 local WAIT_FOR_INPUT = 1;
 
+--#region Imports
+function Import(modname)
+    if not fs.exists("/libs/" .. modname) then
+        local request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
+        if request ~= nil then 
+            local handler = fs.open("/libs/" .. modname .. ".lua", "w");
+            handler.write(request.readAll())
+            handler.close()
+        end
+    end
+    return require("/libs/" .. modname)
+end
+
+local uiLib = Import("ui")
+local osLib = Import("os")
+
 --#region Misc stuff
+
 
 --true, if event happened
 function WaitForEvent(seconds, inputEvent)
@@ -216,6 +233,34 @@ function Turtle:scan(direction)
     else
         return false, nil
     end
+end
+
+function Turtle:scanAll()
+    local _, up = turtle.inspectUp()
+    local _, front = turtle.inspect()
+    local _, down = turtle.inspectDown()
+
+    return {
+        up=up,
+        front=front,
+        down=down,
+    }
+end
+
+function Turtle:scanSurroundings()
+    local scanResults = self:scanAll()
+
+    self:turnRight()
+    _, scanResults.right = self:scan()
+
+    self:turnRight()
+    _, scanResults.back = self:scan()
+
+    self:turnRight()
+    _, scanResults.left = self:scan()
+
+    self:turnRight()
+    return scanResults
 end
 
 function Turtle:__blockInFront()
@@ -531,6 +576,19 @@ end
 ---- Inventory functions
 
 -- true, if the specified inventory space is full
+function Turtle:getInventory(startslot, endslot)
+    startslot = startslot or 1
+    endslot = endslot or 16
+    
+    local inv = {}
+
+    for i = startslot, endslot, 1 do
+        inv[i] = turtle.getItemDetail(i)
+    end
+
+    return inv
+end
+
 function Turtle:invIsFull(startSlot, endSlot)
     for i = startSlot, endSlot, 1 do
         if turtle.getItemCount(i) == 0 then
@@ -589,6 +647,55 @@ function Turtle:invGetItemCount(id)
     return amount
 end
 
+function Turtle:__findInInvConfig(label, startSlot)
+    for i = startSlot, #INV_CONFIG, 1 do
+        if INV_CONFIG[i] == label then
+            return i
+        end
+    end
+    return -1;
+end
+
+function Turtle:getSlotWithLabel(label)
+    local slot = 0
+    repeat
+        slot = self:__findInInvConfig(label, slot + 1)
+        local empty = true
+        if slot ~= -1 then
+            empty = turtle.getItemCount(slot) > 0
+        else
+            Error(label .. " slots are empty")
+            return -1
+        end
+    until not empty
+    
+    return slot
+end
+
+function Turtle:getInvFuelSlot()
+    local LABEL = "fuel"
+    local slot = 1
+    repeat
+        slot = self:__findInInvConfig(LABEL)
+        local empty = true
+        if slot ~= -1 then
+            empty = turtle.getItemCount(slot) > 0
+        else
+            Error(LABEL .. " slots are empty")
+            return -1
+        end
+    until not empty 
+    
+    return slot
+end
+
+function Turtle:getInvLightSlot()
+    
+end
+
+function Turtle:getInvStorageSlot()
+    
+end
 
 ---- Fuel functions
 
@@ -1046,9 +1153,11 @@ term.clear()
 --#endregion
 
 --#region Remote Control
-RemoteControl = {}
+RemoteControl = {
+    actions = {}
+}
 
-function RemoteControl:new(o)
+function RemoteControl:new(o, actions)
     o = o or {}
     setmetatable(o, self)
     self.__index = self
@@ -1058,6 +1167,7 @@ end
 
 function RemoteControl:run()
     if peripheral.isPresent(MODEM_SIDE) then
+        rednet.host(PROTOCOL_RC, os.getComputerLabel())
         rednet.open(MODEM_SIDE)
         while true do
             local event, sender, message, protocol = os.pullEvent("rednet_message")
@@ -1066,6 +1176,7 @@ function RemoteControl:run()
                     rednet.send(sender, {type="error", payload="Turtle is busy"}, PROTOCOL_RC)
                 else
                     local response = "no response";
+                    local responseType = nil
                     if message.type == "cmd" then
                         if message.payload == "moveForward" then
                             response = this:moveForward()
@@ -1085,9 +1196,27 @@ function RemoteControl:run()
                             response = this:digUp()
                         elseif message.payload == "digDown" then
                             response = this:digDown()
+                        elseif message.payload == "inventory" then
+                            response = this:getInventory()
+                            responseType = "INV"
+                        elseif message.payload == "scan" then
+                            response = this:scanSurroundings()
+                            responseType = "SCAN"
                         end
                     end
-                    rednet.send(sender, {type="response", payload=response, position=this.position}, PROTOCOL_RC)
+
+                    rednet.send(sender, {
+                        type="response", 
+                        payload=response,
+                        payloadType=responseType,
+                        position={
+                            x=this.position.x, 
+                            y=this.position.y,
+                            z=this.position.z,
+                            heading=this.heading
+                        }, 
+                        scan=this:scanAll()
+                    }, PROTOCOL_RC)
                 end
             end
         end
@@ -1306,12 +1435,14 @@ function UiRemoteControl(ui)
     ui:reset()
     RUNNING = true;
 
-    print("Remote Control")
+    print("Remote Control | ID: " .. os.getComputerID())
     RemoteControl:new(nil):run()
 end
 
 function CuRemoteControl()
+    rednet.unhost(PROTOCOL_RC, os.getComputerLabel())
     rednet.close()
+    RUNNING = false
 end
 
 --#region main program
