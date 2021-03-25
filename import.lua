@@ -4,7 +4,7 @@
 -- this function for its imports
 
 function Import(modname)
-    if not fs.exists("/libs/" .. modname .. ".lua") then
+    if not fs.exists("/libs/" .. modname .. ".lua") or fs.exists("DEVENV") then
         local request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
         if request ~= nil then 
             local handler = fs.open("/libs/" .. modname .. ".lua", "w");
