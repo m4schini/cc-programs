@@ -12,6 +12,16 @@ Turtle = {
     __TIME_WAIT_INPUT = 1,
 
     log=nil,
+    scan = {},
+    move = {},
+    turn = {},
+    inv = {config={}},
+    data = {persistant={}},
+    location = {
+        position={},
+        heading={}
+    },
+    fuel = {},
 
     heading = 0,
     __HEADING = {
@@ -27,6 +37,25 @@ Turtle = {
         z = 0
     },
 }
+
+local LOG_FILE_PATH = "logs/" .. os.date("%F") .. ".log"
+local LOGS = {}
+
+function Log(msg, level)
+    level = level or "info"
+    table.insert(LOGS, 1, {time=os.time("utc"), clock=os.clock(), level=level, log=msg})
+
+    local h, err = fs.open(LOG_FILE_PATH, fs.exists(LOG_FILE_PATH) and "a" or "w")
+
+    if h ~= nil then
+        h.write(os.date("%c") .. " > [" .. level .. "] " .. msg .. "\n")
+        h.flush()
+        h.close()
+    else
+        print(err)
+    end
+
+end
 
 -- Turtle constructor
 function Turtle:new (o, heading, position, logger, INV_CONFIG)
@@ -71,16 +100,16 @@ function Turtle:new (o, heading, position, logger, INV_CONFIG)
     end
     self.heading = heading or determineHeading()
 
-    o:__localUpdate()
+    o.data.persistant:update()
     return o
 end
 
 function Turtle:init()
-    self.log("+++ booting turtle +++", "boot")
+    Log("+++ booting turtle +++", "boot")
 
     local newTurtle = nil
     local function turtleFromInput()
-        self.log("Turtle was started in Manual Mode", "warning")
+        Log("Turtle was started in Manual Mode", "warning")
         print("You entered manual mode, if this was an accident, reboot turtle (CTRL + R)")
         print("\nEnter coordinates of Turtle:")
 
@@ -103,7 +132,7 @@ function Turtle:init()
     if WaitForEvent(Turtle.__TIME_WAIT_INPUT, "key") then
         newTurtle = turtleFromInput()
     else
-        if self:gpsLocate() then
+        if self.location:locate() then
             --coordinates
             local _, x, y, z = self:gpsLocate()
             local position = {x = x, y = y, z = z}
@@ -111,7 +140,7 @@ function Turtle:init()
             --heading = nil => determine on your own
             newTurtle = Turtle:new(nil, nil, position)
         else
-            newTurtle = self:__localRestore()
+            newTurtle = self.data.persistant:restore()
             if newTurtle == nil then
                 newTurtle = turtleFromInput()
             end
