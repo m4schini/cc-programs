@@ -949,7 +949,7 @@ function UiDebug(system, openLogs)
     --line 3
     paintutils.drawLine(1, 3, WIDTH, 3, colors.gray)
     system.out.setCursorPos(3)
-    system.out.println("Logs (" .. table.maxn(LOGS) .. ")")
+    system.out.println("Logs (" .. table.maxn(LOGS) .. ")", nil, colors.gray)
     local function showLogs()
         --line 4 to height-1
         term.setBackgroundColor(colors.black)
