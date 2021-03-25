@@ -55,7 +55,7 @@ function OS:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanu
     local heightCenter = upperLeftCorner.y + math.floor(height/2)
 
     if borderColor ~= nil then
-        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+        paintutils.drawFilledBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
     end
 
     self.out.setCursorPos(heightCenter, widthCenter)
@@ -86,7 +86,7 @@ end
 
 function OS:runProcess(f, cleanup)
     local function processRunner()
-        f(self.out)
+        f(self)
         
         --reprint menu
         self:printTaskBar()
@@ -101,7 +101,7 @@ function OS:runProcess(f, cleanup)
 
         --run cleanup function
         if cleanup ~= nil then
-            cleanup()
+            cleanup(self)
         end
 
         --reprint menu
