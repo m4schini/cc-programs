@@ -939,14 +939,17 @@ function UiDebug(system, openLogs)
     elseif this.heading == 3 then
         headingStr = "WEST"
     end
-    system.out.writeOnLine(1, "Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
+    system.out.setCursorPos(1)
+    system.out.println("Pos: " .. "{" .. this.position.x .. ", " .. this.position.y .. ", " .. this.position.z .. "} " .. "Heading: " .. headingStr)        
 
     --line 2
-    system.out.writeOnLine(2, "Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit())
+    system.out.setCursorPos(2)
+    system.out.println("Fuel: " .. turtle.getFuelLevel() .. "/" .. turtle.getFuelLimit())
 
     --line 3
     paintutils.drawLine(1, 3, WIDTH, 3, colors.gray)
-    system.out.writeOnLine(3, "Logs (" .. table.maxn(LOGS) .. ")")
+    system.out.setCursorPos(3)
+    system.out.println("Logs (" .. table.maxn(LOGS) .. ")")
     local function showLogs()
         --line 4 to height-1
         term.setBackgroundColor(colors.black)
@@ -955,7 +958,8 @@ function UiDebug(system, openLogs)
             if msg ~= "" then
                 msg = "[" .. msg.level .. "] " .. msg.clock .. "s:" .. msg.log
             end
-            system.out.writeOnLine(i+3, msg)
+            system.out.setCursorPos(i+3)
+            system.out.println(msg)
         end
     end    
     system:addButton({x=WIDTH/2 - 5, y=3}, {x=WIDTH/2 + 7, y=3}, "show logs", showLogs, nil, colors.lightGray)
