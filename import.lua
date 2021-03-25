@@ -4,13 +4,17 @@
 -- this function for its imports
 
 function Import(modname)
-    if not fs.exists("/libs/" .. modname .. ".lua") or fs.exists("DEVENV") then
-        local request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
-        if request ~= nil then 
+    local request = nil
+    if fs.exists("DEVENV") then
+        request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/dev/libs/" .. modname .. ".lua")
+    elseif not fs.exists("/libs/" .. modname .. ".lua") then
+        request = http.get("https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/" .. modname .. ".lua")
+    end
+
+    if request ~= nil then 
             local handler = fs.open("/libs/" .. modname .. ".lua", "w");
             handler.write(request.readAll())
             handler.close()
         end
-    end
     return require("/libs/" .. modname)
 end
