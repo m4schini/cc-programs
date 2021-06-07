@@ -1,26 +1,14 @@
 local TERM_WIDTH, TERM_HEIGHT = term.getSize()
-term.clear()
-term.setCursorPos(1, 1)
 
-local function clear(height, start)
-    height = height or TERM_HEIGHT
-    start = start or 1
-    term.setBackgroundColor(colors.black)
+function printLine(line, color)
+    local oldColor = term.getBackgroundColor()
+    color = color or term.getBackgroundColor()
+    paintutils.drawLine(1, line, TERM_WIDTH, line, color)
 
-    for i = start, height, 1 do
-        term.setCursorPos(1,i)
-        term.clearLine()
-    end
-    term.setCursorPos(1,1)
+    term.setBackgroundColor(oldColor)
 end
 
-local function writeOnLine(line, text)
-    term.setCursorPos(1,line)
-    term.write(text)
-    term.setCursorPos(1,1)
-end
-
-local function write(text, textColor, backgroundColor)
+function write(text, textColor, backgroundColor)
     local beforeTextColor = term.getTextColor()
     local beforeBgColor = term.getBackgroundColor()
     textColor = textColor or colors.white
@@ -35,20 +23,24 @@ local function write(text, textColor, backgroundColor)
     term.setBackgroundColor(beforeBgColor)
 end
 
-local function writeln(text, textColor, backgroundColor)
+function writeln(text, textColor, backgroundColor)
     write(text, textColor, backgroundColor)
     print()
 end
 
-local function printLine(line, color)
-    local oldColor = term.getBackgroundColor()
-    color = color or term.getBackgroundColor()
-    paintutils.drawLine(1, line, TERM_WIDTH, line, color)
+function clear(height, start)
+    height = height or TERM_HEIGHT-1
+    start = start or 1
+    term.setBackgroundColor(colors.black)
 
-    term.setBackgroundColor(oldColor)
+    for i = start, height, 1 do
+        term.setCursorPos(1,i)
+        term.clearLine()
+    end
+    term.setCursorPos(1,1)
 end
 
-local function printStopLine()
+function AbortBar()
     printLine(TERM_HEIGHT, colors.red)
     term.setCursorPos(math.ceil(TERM_WIDTH / 2) - 3, TERM_HEIGHT)
     term.setTextColor(colors.white)
@@ -59,22 +51,125 @@ local function printStopLine()
     term.setCursorPos(1,1)
 end
 
--- Sets cursor position to specified position
--- If the value isn't given, defaults to 1
-local function setCursorPos(row, column)
-    row = row or 1
-    column = column or 1
+Ui = {
+    internal={
+        writeln=writeln,
+        write=write,
+        printLine=printLine
+    },
+    clear=clear,
+    abortBar=AbortBar,
+}
 
-    term.setCursorPos(column, row)
+function LogToTerm(...)
+    print(textutils.serialize({...}, {compact=true}))
+end
+
+function LogToCloud(...)
+    
+end
+
+local LOG_FILE_PATH = "logs/" .. os.date("%F") .. ".log"
+function LogToFile(...)
+    local h, err = fs.open(LOG_FILE_PATH, fs.exists(LOG_FILE_PATH) and "a" or "w")
+
+    if h ~= nil then
+        h.write(os.date("%c") .. " > [INFO] " .. textutils.serializeJSON({...}) .. "\n")
+        h.flush()
+        h.close()
+    else
+        print(err)
+    end
+end
+
+function TaskBar(programs)
+    local color_background = colors.lightGray
+    local color_text = colors.black
+
+    printLine(TERM_HEIGHT, color_background)
+    term.setCursorPos(1, TERM_HEIGHT)
+
+    local buttons = {}
+
+    for key, value in pairs(programs) do
+        local startPos, _ = term.getCursorPos()
+        local menuButtonText = " " .. key .. " |"
+
+        --self:addTouchHandler(value.ui, value.cleanup, xOfCursor, TERM_HEIGHT, xOfCursor + menuButtonText:len() - 1, TERM_HEIGHT)
+        write(menuButtonText, color_text, color_background)
+        local endPos, _ = term.getCursorPos()
+        table.insert(buttons, {
+            xStart=startPos,
+            yStart=TERM_HEIGHT,
+            xEnd=endPos-1,
+            yEnd=TERM_HEIGHT,
+            action=value}
+        )
+    end
+    term.setCursorPos(1, 1)
+
+    return buttons
+end
+
+function Shell(system, log)
+    log = log or LogToFile -- fallback logger
+
+    term.clear()
+    term.setCursorPos(1,1)
+
+    local buttons = TaskBar(system.programs)
+
+    local function waitForAbort()
+        AbortBar()
+        repeat
+            local e, _, x, y = os.pullEvent()
+            local aborted = false;
+            if e == "mouse_click" or e == "monitor_touch" then
+                if y == TERM_HEIGHT then
+                    aborted = true
+                end
+            end
+        until aborted
+    end
+
+    
+
+    while true do
+        local e, _, x, y = os.pullEvent()
+        if e == "mouse_click" or e == "monitor_touch" then
+            for i, value in ipairs(buttons) do
+
+                -- if input was on registered button
+                if x >= value.xStart and x <= value.xEnd and y >= value.yStart and y <= value.yEnd then
+                    if value.action ~= nil then
+
+                        -- end program on abort or finish
+                        parallel.waitForAny(
+                            function ()
+                                value.action.exe(Ui, system, system.turtle)
+                            end,
+                            waitForAbort
+                        )
+
+                        -- if cleanup is provided, (eg. close sockets, etc)
+                        if value.action.cleanup ~= nil then
+                            value.action.cleanup()
+                        end
+                    end
+                    buttons = TaskBar(system.programs)
+                end
+            end
+        end
+    end
 end
 
 return {
-    clear=clear,
-    print=write,
-    println=writeln,
-
-    setCursorPos=setCursorPos,
-
-    drawLine=printLine,
-    drawAbort=printStopLine,
+    ui=Ui,
+    shell=Shell,
+    log={
+        file=LogToFile,
+        cloud=LogToCloud,
+        term=LogToTerm,
+        null=function (...) end
+    }
 }

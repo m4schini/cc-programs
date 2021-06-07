@@ -1,148 +1,275 @@
-local TERM_WIDTH, TERM_HEIGHT = term.getSize()
---local ui = require("libs.ui")
+-- TODOs
+--  -> install
+--  -> import
+
+local expect = require("cc.expect").expect
+local ui = require("libs/ui2")
+
+local Log = ui.log.file
 
 OS = {
-    out=nil,
-    __menu__ = {
-        {name="", ui=nil}
-    },
-    __touchHandlers__ = {},
-    __runningProcess__ = nil,
-    __TOUCH_EVENT__ = ""
+    cid="C" .. os.getComputerID(), -- Computer ID ([Turtle/Computer/Pocket][CC ID])
+    handlers={},
+    programs={},
+    websocket=nil,
+    http_url=nil,
+    ws_url=nil,
+    turtle=nil,
+    __controller_map={},
+    __conTimer = 0;
 }
 
-function OS:new (o, menu, ui_lib, touchEvent)
+-- constructor
+-- - `o` Turtle Object
+-- - `cid` Computer ID
+-- - `handlers` Array of event handlers to be added
+-- - `websocket` websocket with server connection
+-- - `controllerMap` Map of string instructions and corresponding functions
+function OS:new(o, cid, handlers, turtle, http_url, ws_url, controller_map)
     o = o or {}
     setmetatable(o, self)
     self.__index = self
-    self.__TOUCH_EVENT__ = touchEvent or "mouse_click"
-    self.__touchHandlers__ = {}
-    self.__menu__ = menu or {{name="Debug", ui=UiDebug}}
-    self.__runningProcess__ = nil
 
-    self.out = ui_lib
+    self.turtle = turtle or self.turtle
+    self.cid = cid or self.cid
+    self.http_url = http_url or self.http_url
+    self.ws_url = ws_url or self.ws_url
+    self.__controller_map = controller_map or self.__controller_map
+
+    -- register given Handlers
+    self:addHandlers(handlers)
+
+    -- register websocket handlers
+    self:addHandlers(BuildWebsocketHandlers(self))
+    
+    self:loadPrograms()
     return o
 end
 
-function OS:addTouchHandler(handler, cleanup, xStart, yStart, xEnd, yEnd)
-    table.insert(self.__touchHandlers__, {
-        handler = handler,
-        cleanup = cleanup,
-        xStart = xStart,
-        xEnd = xEnd,
-        yStart = yStart,
-        yEnd = yEnd
-    })
-end
+function OS:loadPrograms()
+    local programFiles = fs.list("programs");
+    Log(programFiles)
+    for index, pName in ipairs(programFiles) do
+        Log("trying to install " .. pName)
 
-function OS:removeTouchHandler(handler)
-    for pos, value in ipairs(self.__touchHandlers__) do
-        if value.handler == handler then
-            table.remove(self.__touchHandlers__, pos)
+        -- look for file end
+        local index = string.find(pName, ".lua")
+        -- remove file end, if exists
+        if index ~= nil then
+            pName = string.sub(pName, 0, index-1)
         end
+        local program = require("programs/" .. pName)
+
+        -- install program dependencies
+        if program.dependencies ~= nil then
+            self:addHandlers(program.dependencies.handlers or {})
+        end
+
+        self.programs[pName] = {exe=program.exe, cleanup=program.cleanup}
+        Log(pName .. " was installed")
     end
 end
 
-function OS:resetTouchHandlers()
-    self.__touchHandlers__ = {}
-end
-
-function OS:addButton(upperLeftCorner, lowerRightCorner, content, action, cleanup, borderColor)
-    local width = math.abs(upperLeftCorner.x - lowerRightCorner.x)
-    local height = math.abs(upperLeftCorner.y - lowerRightCorner.y)
-
-    local widthCenter = upperLeftCorner.x + (math.ceil(width / 2) - math.floor(content:len() / 2))
-    local heightCenter = upperLeftCorner.y + math.floor(height/2)
-
-    if borderColor ~= nil then
-        paintutils.drawBox(upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y, borderColor)
+-- adds an array of handlers
+-- expects array of objects {event: string, handler: function}
+function OS:addHandlers(handlers)
+    expect(1, handlers, "table")
+    
+    -- add all given handlers to handler map
+    for _, value in pairs(handlers) do
+        self:addHandler(value.event, value.handler)
     end
-
-    self.out.setCursorPos(heightCenter, widthCenter)
-    self.out.print(content, nil, colors.black)
-
-    self:addTouchHandler(action, cleanup, upperLeftCorner.x, upperLeftCorner.y, lowerRightCorner.x, lowerRightCorner.y)
 end
 
-function OS:printTaskBar()
-    local color_background = colors.lightGray
-    local color_text = colors.black
+-- adds a new handlers
+--
+-- handlers are being triggert by events 
+-- in the global event loop
+function OS:addHandler(event, handler)
+    expect(1, event, "string")      -- event name
+    expect(2, handler, "function")  -- event handler funtion
 
-    self:resetTouchHandlers()
+    -- Get saved handlers, then add new handler
+    local eventHandlers = self.handlers[event] or {}
+    table.insert(eventHandlers, handler)
 
-    self.out.drawLine(TERM_HEIGHT, color_background)
-    self.out.setCursorPos(TERM_HEIGHT)
+    -- save handler array in global handlers
+    Log("registered handler for " .. event, "SYSTEM STARTUP")
+    self.handlers[event] = eventHandlers
+end
 
-    for _, value in ipairs(self.__menu__) do
-        local xOfCursor, _ = term.getCursorPos()
-        local menuButtonText = " " .. value.name .. " |"
-
-        self:addTouchHandler(value.ui, value.cleanup, xOfCursor, TERM_HEIGHT, xOfCursor + menuButtonText:len() - 1, TERM_HEIGHT)
-        self.out.print(menuButtonText, color_text, color_background)
+function OS:wsSendJSON(data)
+    if self.websocket ~= nil then
+        self.websocket.send(textutils.serializeJSON({source=self.cid, data=textutils.serializeJSON(data)}))
+    else
+        Log("[WARN] NO WEBSOCKET FOUND")
     end
-
-    self.out.setCursorPos(1, 1)
 end
 
-function OS:runProcess(f, cleanup)
-    local function processRunner()
-        f(self)
+-- Main program loop. Executes registered event handlers
+function OS:run(shell)
+    http.websocketAsync(self.ws_url)
+
+    parallel.waitForAll(
+        -- user interface
+        function ()
+            if shell ~= nil then
+                shell(self)
+            else
+                print("WARNING! RUNNING WITHOUT SHELL")
+            end
+        end,
+
+        -- background process loop
+        function ()
+            while true do
+                -- pack event
+                local event = {os.pullEvent()}
+                local eventName = event[1]
+                if eventName ~= "http_success" and eventName ~= "http_success" and eventName ~= "http_success" then 
+                    ui.log.cloud(event, "EVENT") 
+                end
         
-        --reprint menu
-        self:printTaskBar()
-    end
-    --function waiting for kill signal
-    local function processHandler()
-        self.out.drawAbort()
-
-        repeat
-            local _, _, x, y = os.pullEvent(self.__TOUCH_EVENT__)
-        until y == TERM_HEIGHT
-
-        --run cleanup function
-        if cleanup ~= nil then
-            cleanup(self)
+                -- run registered handlers on event
+                for _, eventHandler in pairs(self.handlers[eventName] or {}) do
+                    if event ~= nil then
+                        eventHandler(unpack(event))
+                    else
+                        eventHandler()
+                    end
+                end
+                
+            end
         end
+    )
 
-        --reprint menu
-        self:printTaskBar()
-    end
-
-    --finishes if program is finished or kill signal is send
-    parallel.waitForAny(processRunner, processHandler)
+    
 end
 
-function OS:handleTouch(x, y)
-    local function DisplayError(_, _)
-        Error("Missing handler for registered touch input field")
+--#region FACTORIES
+-- used to build certain components in runtime
+
+-- websocket connection handler factory
+-- - `operatingSystem` OS instance
+-- - **@returns** `Array`<{event: `string`, handler: `function`}
+function BuildWebsocketHandlers(operatingSystem) 
+    -- websocket timer querer
+    local function retryHandshake(_,_,e)
+        Log("websocket failed " .. (e or ""))
+        Log("starting reconnection attempts")
+        operatingSystem.__conTimer = os.startTimer(6)
     end
 
-    for i, touch in ipairs(self.__touchHandlers__) do
-        if x >= touch.xStart and x <= touch.xEnd and y >= touch.yStart and y <= touch.yEnd then
-            self:runProcess(touch.handler or DisplayError, touch.cleanup)
+    -- complete websocket handshake and save connection
+    local function completeHandshake(e,url,ws)
+        Log("New WebSocket established")
+
+            -- only execute on turtle startup
+            if operatingSystem.websocket == nil then
+                operatingSystem.websocket=ws -- saving websocket
+                operatingSystem.websocket.send(operatingSystem.cid) -- sending identification to server
+
+                -- building the controller with the websocket connection
+                -- TODO: remove duplicate controllers
+                if operatingSystem.__controller_map ~= nil then
+                    local controller = BuildController(operatingSystem.ws_url, operatingSystem.__controller_map, function (data)
+                        Log("SENDING: data")
+                        operatingSystem.websocket.send(textutils.serializeJSON({source=operatingSystem.cid, data=data}))
+                    end)
+                    operatingSystem:addHandler("websocket_message", controller)
+                end
+            else
+                operatingSystem.websocket=ws -- saving websocket
+                operatingSystem.websocket.send(operatingSystem.cid) -- sending identification to server
+            end
+    end
+
+    -- retry websocket connection on timer event
+    local function startHandshake(_, id)
+        if id == operatingSystem.__conTimer then
+            http.websocketAsync(operatingSystem.ws_url)
         end
     end
+
+    return {
+        {event="websocket_success", handler=completeHandshake},
+        {event="timer", handler=startHandshake},
+        {event="websocket_failure", handler=retryHandshake},
+        {event="websocket_closed", handler=retryHandshake}
+    }
 end
 
-function OS:awaitTouch()
-    local _, _, x, y = os.pullEvent(self.__TOUCH_EVENT__)
-    self:handleTouch(x, y)
-end
+function BuildController(ctrl_url, instructionMap, responder)
+    -- websocket_message event paramters
+    return function (_, url, msg)
+        Log("[C] CONTROLLER CALLED")
+        if url == ctrl_url then
+            Log("[C] INSTR:", msg)
+            msg = textutils.unserialiseJSON(msg)
 
-function OS:run(startpage, startpageCleanup, ...)
-    --add stop button
-    --table.insert(self.menu, 1, {name="Stop", nil})
+            local instructionMap = instructionMap
 
-    self:printTaskBar()
-    if startpage ~= nil then
-        self:runProcess(startpage, startpageCleanup)
+            local runner = instructionMap[msg.instruction]
+            if runner ~= nil then
+                local response = runner()
+                Log("[C] RUNNER EXECUTED; SENDING RESPONSE")
+                Log("R:", response)
+                responder({instruction=msg.instruction, response=response})
+            end
+        end
+        Log("[C] CONTROLLER FINISHED")
     end
-    while true do
-        self:awaitTouch()
-        sleep(0.1)
-    end
 end
+--#endregion
 
-
+--@OBSOLETE
+-- websocket connection handler factory
+-- - **@returns** `Array`<{event: `string`, handler: `function`}
+--function OS:buildWebsocketHandlers() 
+--    -- websocket timer querer
+--    local function retryHandshake(_,_,e)
+--        Log("websocket failed " .. (e or ""))
+--        Log("starting reconnection attempts")
+--        self.__conTimer = os.startTimer(6)
+--    end
+--
+--    -- complete websocket handshake and save connection
+--    local function completeHandshake(e,url,ws)
+--        Log("New WebSocket established")
+--
+--            -- only execute on turtle startup
+--            if self.websocket == nil then
+--                self.websocket=ws -- saving websocket
+--                self.websocket.send(self.cid) -- sending identification to server
+--
+--                -- building the controller with the websocket connection
+--                -- TODO: remove duplicate controllers
+--                if self.__controller_map ~= nil then
+--                    local controller = BuildController(self.ws_url, self.__controller_map, function (data)
+--                        Log("SENDING: data")
+--                        self.websocket.send(textutils.serializeJSON({source=self.cid, data=data}))
+--                    end)
+--                    self:addHandler("websocket_message", controller)
+--                end
+--            else
+--                self.websocket=ws -- saving websocket
+--                self.websocket.send(self.cid) -- sending identification to server
+--            end
+--    end
+--
+--    -- retry websocket connection on timer event
+--    local function startHandshake(_, id)
+--        if id == self.__conTimer then
+--            http.websocketAsync(self.ws_url)
+--        end
+--    end
+--
+--    return {
+--        {event="websocket_success", handler=completeHandshake},
+--        {event="timer", handler=startHandshake},
+--        {event="websocket_failure", handler=retryHandshake},
+--        {event="websocket_closed", handler=retryHandshake}
+--    }
+--end
 
 return OS
