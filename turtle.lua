@@ -373,7 +373,7 @@ function Turtle.getInventory(startslot, endslot)
 end
 
 function Turtle.invIsFull(startSlot, endSlot)
-    for i = startSlot, endSlot, 1 do
+    for i = startSlot or 1, endSlot or 16, 1 do
         if turtle.getItemCount(i) == 0 then
             return false
         end
@@ -384,7 +384,7 @@ end
 
 function Turtle.dropInv(startSlot, endSlot)
     local empty = false;
-    for i = startSlot, endSlot, 1 do
+    for i = startSlot or 1, endSlot or 16, 1 do
         turtle.select(i)
         turtle.drop(turtle.getItemCount(i))
     end

@@ -1,6 +1,6 @@
 local SOURCES = {
     ["libs/os"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/os.lua",
-    ["libs/ui"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/os.lua",
+    ["libs/ui"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/ui.lua",
     ["turtle"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/turtle.lua"
 }
 
@@ -8,7 +8,9 @@ term.clear()
 term.setCursorPos(1,1)
 
 for path, url in pairs(SOURCES) do
-    local response = http.get(url)
+    local source = url .. "?flush_cache=True"-- #<number> used as cache break
+    print("GET:", source)
+    local response = http.get(source) 
     if response ~= nil then
         local h, err = fs.open(path, fs.exists(path) and "a" or "w")
         if err ~= nil then
