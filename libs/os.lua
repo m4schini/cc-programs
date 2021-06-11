@@ -3,7 +3,7 @@
 --  -> import
 
 local expect = require("cc.expect").expect
-local ui = require("libs/ui2")
+local ui = require("libs/ui")
 
 local Log = ui.log.file
 

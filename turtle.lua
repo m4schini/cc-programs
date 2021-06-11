@@ -1,5 +1,5 @@
-local ops = require("/libs/os2")
-local ui = require("/libs/ui2")
+local ops = require("/libs/os")
+local ui = require("/libs/ui")
 local expect = require("cc.expect").expect
 
 local Log = ui.log.file
