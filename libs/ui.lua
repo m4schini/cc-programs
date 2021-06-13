@@ -98,13 +98,14 @@ function TaskBar(programs)
         --self:addTouchHandler(value.ui, value.cleanup, xOfCursor, TERM_HEIGHT, xOfCursor + menuButtonText:len() - 1, TERM_HEIGHT)
         write(menuButtonText, color_text, color_background)
         local endPos, _ = term.getCursorPos()
-        table.insert(buttons, {
+        buttons[key] = {
             xStart=startPos,
             yStart=TERM_HEIGHT,
             xEnd=endPos-1,
             yEnd=TERM_HEIGHT,
-            action=value}
-        )
+            action=value
+        }
+        
     end
     term.setCursorPos(1, 1)
 
@@ -132,29 +133,63 @@ function Shell(system, log)
         until aborted
     end
 
-    
+    local TEMP_PATH = "temp.json"
+    -- save program for autorestore
+    local function rememberProgram(appname)
+        local h, err = fs.open(TEMP_PATH, "w")
 
+        if h ~= nil then
+            h.write(appname == nil and "" or textutils.serializeJSON({["restore"] = appname}))
+            h.flush()
+            h.close()
+        else
+            print(err)
+        end
+    end
+
+    local function executeProgram(action)
+        parallel.waitForAny(
+            function ()
+                action.exe(Ui, system, system.turtle)
+            end,
+            waitForAbort
+        )
+
+        -- if cleanup is provided, (eg. close sockets, etc)
+        rememberProgram(nil)
+        if action.cleanup ~= nil then
+            action.cleanup()
+        end
+    end
+    
+    -- restores program after restart
+    local function restoreProgram()
+        local h, err = fs.open(TEMP_PATH, "r")
+        if h ~= nil then
+            local tempdata = textutils.unserialiseJSON(h.readAll())
+            h.close()
+            local appname = tempdata ~= nil and tempdata.restore or nil
+            if appname ~= nil then
+                executeProgram(buttons[appname].action)
+                buttons = TaskBar(system.programs)
+            end
+        end
+    end
+
+    restoreProgram()
+
+    
+    -- start program on menu input
     while true do
         local e, _, x, y = os.pullEvent()
         if e == "mouse_click" or e == "monitor_touch" then
-            for i, value in ipairs(buttons) do
+            for appname, appdata in pairs(buttons) do
 
                 -- if input was on registered button
-                if x >= value.xStart and x <= value.xEnd and y >= value.yStart and y <= value.yEnd then
-                    if value.action ~= nil then
-
-                        -- end program on abort or finish
-                        parallel.waitForAny(
-                            function ()
-                                value.action.exe(Ui, system, system.turtle)
-                            end,
-                            waitForAbort
-                        )
-
-                        -- if cleanup is provided, (eg. close sockets, etc)
-                        if value.action.cleanup ~= nil then
-                            value.action.cleanup()
-                        end
+                if x >= appdata.xStart and x <= appdata.xEnd and y >= appdata.yStart and y <= appdata.yEnd then
+                    if appdata.action ~= nil then
+                        rememberProgram(appname)
+                        executeProgram(appdata.action)
                     end
                     buttons = TaskBar(system.programs)
                 end

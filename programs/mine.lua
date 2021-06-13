@@ -11,16 +11,21 @@ function exe(ui, system, t)
 
     function digSlice()
         t:digMove()
+        if not t:scanDown() then
+            t:placeDown(1)
+        end
         t:digUp()
     end
 
     repeat
 
         for i = 1, gap + 1, 1 do
-            if i == math.ceil(gap / 2) then
+            if i == math.ceil(gap + 1 / 2) then
                 if turtle.getItemDetail(torch_slot).name == 'minecraft:torch' then
+                    t:moveBack()
                     t:placeUp(torch_slot)
                     turtle.select(1)
+                    t:moveForward()
                 end
             end
             digSlice()

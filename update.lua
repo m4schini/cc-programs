@@ -1,6 +1,8 @@
 local SOURCES = {
     ["libs/os"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/os.lua",
     ["libs/ui"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/libs/ui.lua",
+    ["programs/farm"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/programs/farm.lua",
+    ["programs/mine"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/programs/mine.lua",
     ["turtle"] = "https://raw.githubusercontent.com/m4schini/cc-programs/main/turtle.lua"
 }
 
