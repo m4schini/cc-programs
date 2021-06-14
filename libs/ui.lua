@@ -150,7 +150,12 @@ function Shell(system, log)
     local function executeProgram(action)
         parallel.waitForAny(
             function ()
-                action.exe(Ui, system, system.api.turtle)
+                local callData = {pcall(action.exe, Ui, system, system.api.turtle)}
+
+                -- error handling
+                if not callData[1] then
+                    print(table.unpack(callData, 2))
+                end
             end,
             waitForAbort
         )

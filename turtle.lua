@@ -34,36 +34,13 @@ function Turtle:new(o)
 end
 
 function Turtle:loadPosition()
-    local function getPos()
-        local POS_FILE_PATH = "position.json";
-        local h, err = fs.open(POS_FILE_PATH, "w")
-
-        local gpsWorked, x, y ,z = Turtle.getGpsPosition()
-        if gpsWorked then
-            h.write(textutils.serializeJSON({x=x,y=y,z=z}))
-            --h.flush()
-            h.close()
-
-            return x, y ,z
-        elseif fs.exists("position.json") then
-            local content = h.readAll()
-            if content ~= nil then
-                local pos = textutils.unserialiseJSON(content)
-                return pos.x, pos.y, pos.z
-            end
-        else
-            return 0,0,0
-        end
-    end
-
-    local x,y,z = getPos()
+    local _, x, y ,z = Turtle.getGpsPosition()
     self.position = {
         x=x,
         y=y,
         z=z,
         heading = 0
     }
-    Log("Using Coordinates as current Position", self.position)
     os.queueEvent('position', x, y ,z)
     return x, y, z
 end
@@ -439,9 +416,8 @@ end
 local system = ops:new(
     nil, 
     t.label, 
-    handlers, 
-    t,
-    "ws://malteschink.de:5050", 
-    "ws://malteschink.de:5051", 
-    controller_map)
+    nil,
+    "ws://malteschink.de:5051",
+    t
+)
 system:run(ui.shell)
