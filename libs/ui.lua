@@ -103,7 +103,7 @@ function TaskBar(programs)
             yStart=TERM_HEIGHT,
             xEnd=endPos-1,
             yEnd=TERM_HEIGHT,
-            action=value
+            action=value 
         }
         
     end
@@ -150,7 +150,7 @@ function Shell(system, log)
     local function executeProgram(action)
         parallel.waitForAny(
             function ()
-                action.exe(Ui, system, system.turtle)
+                action.exe(Ui, system, system.api.turtle)
             end,
             waitForAbort
         )
@@ -169,7 +169,7 @@ function Shell(system, log)
             local tempdata = textutils.unserialiseJSON(h.readAll())
             h.close()
             local appname = tempdata ~= nil and tempdata.restore or nil
-            if appname ~= nil then
+            if appname ~= nil and buttons[appname] ~= nil then
                 executeProgram(buttons[appname].action)
                 buttons = TaskBar(system.programs)
             end

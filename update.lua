@@ -14,7 +14,7 @@ for path, url in pairs(SOURCES) do
     print("GET:", source)
     local response = http.get(source) 
     if response ~= nil then
-        local h, err = fs.open(path, fs.exists(path) and "a" or "w")
+        local h, err = fs.open(path, fs.exists(path) "w")
         if err ~= nil then
             print(path, ":", err)
         else

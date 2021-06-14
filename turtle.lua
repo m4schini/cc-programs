@@ -82,8 +82,8 @@ function Turtle.getGpsPosition()
     end
 end
 
--- - `horizontal` horizontal offset
--- - `vertical` vertical offset
+-- - `horizontal` (optional) horizontal offset
+-- - `vertical` (optional) vertical offset
 function Turtle:getCoordinate(horizontal, vertical)
     horizontal = horizontal or 1
     vertical = vertical or 0
@@ -399,32 +399,6 @@ end
 
 local t = Turtle:new()
 
-
-function HandleInvChange()
-    Log("changed inv")
-    local json = "data=" .. textutils.serializeJSON({
-        tag="INV",
-        data=Turtle.getInventory(),
-        source=t.label
-    })
-    Log(json)
-    http.request("http://malteschink.de:5050/api/data", json)
-end
-
-function HandleScan(_, pos, data)
-    local update = {
-        data=data,
-        position=pos
-    }
-    Log(update)
-    --http.request("http://malteschink.de:5050/api/data", textutils.serializeJSON(update))
-end
-
-local handlers = {
-    {event="turtle_inventory", handler=HandleInvChange},
-    {event="position", handler=Log}
-}
-
 -- map of instructions than can be triggered remotly (eq. rednet, websocket)
 local controller_map = {
     moveForward=function ()
@@ -447,6 +421,19 @@ local controller_map = {
     end,
     dig=t.dig,
 }
+
+Factory = {}
+
+function Factory.makeControllerHandlers(robot)
+    local function handleTurtleInstruction(eventName, instruction, ...)
+        local runner = robot[instruction]
+        runner(robot, ...)
+    end
+    
+    return {
+        {event="instruction", handler=handleTurtleInstruction}
+    }
+end
 
 -- creating underlying os
 local system = ops:new(
